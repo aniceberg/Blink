@@ -1,0 +1,2 @@
+class JobCanceled(RuntimeError):
+    pass

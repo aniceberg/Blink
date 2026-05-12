@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }}{% endblock %}
+{% block content %}
+{% set range_start = job.resolved_start_at or job.start_at %}
+{% set range_end = job.resolved_end_at or job.end_at %}
+<section class="page-head">
+  <div>
+    <h1>Job #{{ job.id }}</h1>
+    <p>{{ job.camera_names|join(", ") }} · {{ job.sample_interval_seconds }}s interval · {{ job.output_fps }}fps · {{ job.encoder }} · {{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</p>
+  </div>
+  <div class="actions">
+    {% if job.output_path %}<button class="button primary" type="button" data-reveal-job data-reveal-url="/jobs/{{ job.id }}/reveal">Reveal in Finder</button>{% endif %}
+    {% if job.status.value in ["queued", "running"] %}
+      <form method="post" action="/jobs/{{ job.id }}/cancel"><button class="button danger">Cancel</button></form>
+    {% else %}
+      <form method="post" action="/jobs/{{ job.id }}/retry"><button class="button">Retry</button></form>
+    {% endif %}
+  </div>
+</section>
+
+{% if job.output_path %}
+<section class="panel">
+  <h2>Video preview</h2>
+  <button class="video-preview" type="button" data-open-video-modal>
+    {% if job.thumbnail_path %}
+      <img src="/jobs/{{ job.id }}/thumbnail" alt="Timelapse preview frame">
+    {% else %}
+      <span>No thumbnail</span>
+    {% endif %}
+  </button>
+  <p class="field-help" data-reveal-status></p>
+</section>
+
+<div class="modal-backdrop" data-video-modal hidden>
+  <div class="video-modal" role="dialog" aria-modal="true" aria-label="Timelapse video preview">
+    <button class="icon-button modal-close" type="button" data-close-video-modal title="Close preview" aria-label="Close preview">×</button>
+    <video controls preload="metadata" src="/media/{{ job.id }}"></video>
+  </div>
+</div>
+{% endif %}
+
+<section class="panel job-status-panel" data-job-status-url="/jobs/{{ job.id }}/status" data-job-active="{{ '1' if job.status.value in ['queued', 'running'] else '0' }}">
+  <div class="detail-grid">
+    <div>
+      <span>Start</span>
+      <strong data-job-range-start>{{ range_start.strftime("%Y-%m-%d %H:%M:%S") if range_start else "Pending" }}</strong>
+    </div>
+    <div>
+      <span>End</span>
+      <strong data-job-range-end>{{ range_end.strftime("%Y-%m-%d %H:%M:%S") if range_end else "Pending" }}</strong>
+    </div>
+    <div>
+      <span>Daily window</span>
+      <strong data-job-daily-window>{{ job.daily_start ~ "-" ~ job.daily_end if job.daily_window_enabled else "Full day" }}</strong>
+    </div>
+    <div>
+      <span>Elapsed</span>
+      <strong data-job-elapsed>{{ "--:--:--" if elapsed_seconds is none else "%02d:%02d:%02d"|format(elapsed_seconds // 3600, (elapsed_seconds % 3600) // 60, elapsed_seconds % 60) }}</strong>
+    </div>
+    <div>
+      <span>Output scale</span>
+      <strong>{{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</strong>
+    </div>
+  </div>
+  <div class="progress-head">
+    <strong data-job-status>{{ job.status.value }}</strong>
+    <span data-job-progress-label>{{ "%.1f"|format(job.progress) }}%</span>
+  </div>
+  <div class="progress"><div data-job-progress-bar style="width: {{ job.progress }}%"></div></div>
+  <p data-job-message>{{ job.message }}</p>
+  <p class="field-help" data-job-counts>{{ job.processed_frame_count }} of {{ job.planned_frame_count }} requested frame timestamps processed</p>
+  {% if job.error %}<pre class="error-box">{{ job.error }}</pre>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>Recent frame manifest</h2>
+  {% if frames %}
+    <table>
+      <thead><tr><th>Requested</th><th>Camera</th><th>Status</th><th>Source</th><th>Error</th></tr></thead>
+      <tbody>
+        {% for frame in frames %}
+          <tr>
+            <td>{{ frame["requested_at"] }}</td>
+            <td><code>{{ frame["camera_id"] }}</code></td>
+            <td><span class="status {{ 'ok' if frame['status'] == 'success' else 'bad' }}">{{ frame["status"] }}</span></td>
+            <td>{{ frame["source_method"] or "" }}</td>
+            <td>{{ frame["error"] or "" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No frames recorded yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

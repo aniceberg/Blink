@@ -1,0 +1,117 @@
+{% macro view_toggle(storage_key) -%}
+  <div class="segmented" data-camera-view-toggle data-storage-key="{{ storage_key }}" aria-label="Camera display mode">
+    <button type="button" class="segmented-button" data-view-choice="list" aria-pressed="true">List</button>
+    <button type="button" class="segmented-button" data-view-choice="grid" aria-pressed="false">Grid</button>
+  </div>
+{%- endmacro %}
+
+{% macro camera_filters(consoles, show_console_filters=false) -%}
+  <div class="camera-filter-bar" data-camera-filter-bar>
+    <label>Search cameras
+      <input type="search" placeholder="Filter by name" data-camera-search autocomplete="off">
+    </label>
+    {% if show_console_filters and consoles|length > 1 %}
+      <div class="console-filter-group" aria-label="Console filters">
+        {% for console in consoles %}
+          <label class="check"><input type="checkbox" value="{{ console.id }}" data-console-filter checked> {{ console.name }}</label>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro snapshot_placeholder() -%}
+  <div class="snapshot-placeholder" aria-label="Snapshot unavailable">
+    <span>No snapshot</span>
+  </div>
+{%- endmacro %}
+
+{% macro hover_name(camera) -%}
+  <span class="camera-name-preview">
+    <span class="camera-name">{{ camera.name }}</span>
+    <span class="snapshot-popover" aria-hidden="true">
+      <img data-snapshot-src="/cameras/{{ camera.camera_id }}/snapshot" alt="">
+      {{ snapshot_placeholder() }}
+    </span>
+  </span>
+{%- endmacro %}
+
+{% macro camera_list_table(cameras) -%}
+  <div class="camera-view camera-view-list" data-camera-view="list">
+    <table>
+      <thead><tr><th>Name</th><th>ID</th><th>Model</th><th>Console</th><th>Status</th><th>Recording</th></tr></thead>
+      <tbody>
+        {% for camera in cameras %}
+          <tr data-camera-item data-camera-name="{{ camera.name|lower }}" data-console-id="{{ camera.console_id }}">
+            <td>{{ hover_name(camera) }}</td>
+            <td><code>{{ camera.camera_id }}</code></td>
+            <td>{{ camera.model or "Unknown" }}</td>
+            <td>{{ camera.console_name }}</td>
+            <td><span class="status {{ 'ok' if camera.is_connected else 'bad' }}">{{ camera.state or "Unknown" }}</span></td>
+            <td>{{ "Yes" if camera.is_recording else "No" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{%- endmacro %}
+
+{% macro camera_grid(cameras) -%}
+  <div class="camera-view camera-grid" data-camera-view="grid" hidden>
+    {% for camera in cameras %}
+      <article class="camera-card" data-camera-item data-camera-name="{{ camera.name|lower }}" data-console-id="{{ camera.console_id }}">
+        <div class="camera-card-image">
+          <img data-snapshot-src="/cameras/{{ camera.camera_id }}/snapshot" alt="{{ camera.name }} latest snapshot">
+          {{ snapshot_placeholder() }}
+        </div>
+        <div class="camera-card-body">
+          <h2>{{ camera.name }}</h2>
+          <p>{{ (camera.model or "Unknown model") | replace(" Camera", "") | replace("Camera ", "") | trim or "Unknown model" }}</p>
+          <p class="muted">{{ camera.console_name }}</p>
+          <div class="camera-card-meta">
+            <span class="status {{ 'ok' if camera.is_connected else 'bad' }}">{{ camera.state or "Unknown" }}</span>
+            <span>{{ "Recording" if camera.is_recording else "Not recording" }}</span>
+          </div>
+          <code>{{ camera.camera_id }}</code>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro camera_picker_list(cameras) -%}
+  <div class="camera-view camera-picker-list" data-camera-view="list">
+    {% for camera in cameras %}
+      <label class="camera-picker-row" data-camera-item data-camera-name="{{ camera.name|lower }}" data-console-id="{{ camera.console_id }}">
+        <input type="checkbox" name="camera_ids" value="{{ camera.camera_id }}">
+        <span class="camera-picker-main">{{ hover_name(camera) }}</span>
+        <span class="muted">{{ camera.console_name }}</span>
+        <span class="status {{ 'ok' if camera.is_connected else 'bad' }}">{{ camera.state or "Unknown" }}</span>
+        <span>{{ (camera.model or "Unknown") | replace(" Camera", "") | replace("Camera ", "") | trim or "Unknown" }}</span>
+      </label>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro camera_picker_grid(cameras) -%}
+  <div class="camera-view camera-grid camera-picker-grid" data-camera-view="grid" hidden>
+    {% for camera in cameras %}
+      <label class="camera-card camera-picker-card" data-camera-item data-camera-name="{{ camera.name|lower }}" data-console-id="{{ camera.console_id }}">
+        <input type="checkbox" name="camera_ids" value="{{ camera.camera_id }}">
+        <div class="camera-card-image">
+          <img data-snapshot-src="/cameras/{{ camera.camera_id }}/snapshot" alt="{{ camera.name }} latest snapshot">
+          {{ snapshot_placeholder() }}
+        </div>
+        <div class="camera-card-body">
+          <h2>{{ camera.name }}</h2>
+          <p>{{ (camera.model or "Unknown model") | replace(" Camera", "") | replace("Camera ", "") | trim or "Unknown model" }}</p>
+          <p class="muted">{{ camera.console_name }}</p>
+          <div class="camera-card-meta">
+            <span class="status {{ 'ok' if camera.is_connected else 'bad' }}">{{ camera.state or "Unknown" }}</span>
+            <span>{{ "Recording" if camera.is_recording else "Not recording" }}</span>
+          </div>
+        </div>
+      </label>
+    {% endfor %}
+  </div>
+{%- endmacro %}

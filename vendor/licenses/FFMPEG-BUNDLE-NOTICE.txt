@@ -1,0 +1,12 @@
+Blink bundles FFmpeg and FFprobe for personal/local macOS app use.
+
+Downloaded from:
+- https://www.osxexperts.net/ffmpeg80arm.zip
+- https://www.osxexperts.net/ffprobe80arm.zip
+
+The OSXExperts Apple Silicon builds advertise GPL/libx265 support. Keep this
+notice with redistributed app bundles, and perform a full license, source-code,
+signing, and notarization review before any public distribution.
+
+FFmpeg project: https://ffmpeg.org/
+OSXExperts builds: https://www.osxexperts.net/

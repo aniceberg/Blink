@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Setup{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Setup</h1>
+    <p>Connect Blink to your local UniFi Protect console.</p>
+  </div>
+</section>
+
+{% if saved %}<div class="notice success">Settings saved.</div>{% endif %}
+{% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+
+<form class="panel form" method="post" action="/setup">
+  <h2>Global settings</h2>
+  <div class="two">
+    <label>Timezone
+      <select name="timezone">
+        {% for tz in timezones %}
+          <option value="{{ tz }}" {% if tz == settings.timezone %}selected{% endif %}>{{ tz }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="label-with-tip">Completed videos directory <span class="tip-icon" data-tip="Blink creates a job_ID folder here for each completed timelapse.">i</span></span>
+      <div class="input-action-row">
+        <input name="output_dir" value="{{ settings.output_dir }}" placeholder="/Users/isaac/Movies/Blink" autocomplete="off" spellcheck="false" data-output-dir>
+        <button class="button" type="button" data-choose-output-dir>Choose...</button>
+      </div>
+      <span class="field-help" data-output-dir-status></span>
+    </label>
+  </div>
+  <button class="button primary" type="submit">Save settings</button>
+</form>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>UniFi consoles</h2>
+  </div>
+  {% if consoles %}
+    <div class="console-list">
+      {% for console in consoles %}
+        <form class="console-card form" method="post" action="/setup/consoles/{{ console.id }}">
+          <div class="fieldset-head">
+            <strong>{{ console.name }}</strong>
+            <label class="check"><input type="checkbox" name="enabled" {% if console.enabled %}checked{% endif %}> Enabled</label>
+          </div>
+          <div class="two">
+            <label>Display name
+              <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
+            </label>
+            <label>UniFi host
+              <div class="input-action-row">
+                <input name="host" value="{{ console.host }}" placeholder="https://192.168.1.1" required data-unifi-host>
+                <button class="button" type="button" data-detect-host>Detect</button>
+              </div>
+              <span class="field-help" data-detect-host-status></span>
+            </label>
+          </div>
+          <label>Integration API key
+            <div class="secret-field">
+              <input name="api_key" value="{{ console.api_key }}" placeholder="Protect API key" type="password" data-secret-input>
+              <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </label>
+          <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
+          <div class="actions">
+            <button class="button primary" type="submit">Save console</button>
+            <button class="button danger" type="submit" form="delete-console-{{ console.id }}">Delete</button>
+          </div>
+        </form>
+        <form id="delete-console-{{ console.id }}" method="post" action="/setup/consoles/{{ console.id }}/delete" onsubmit="return confirm('Delete {{ console.name }} and its cached cameras? Existing jobs and videos are kept.');"></form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">No consoles saved yet.</p>
+  {% endif %}
+</section>
+
+<form class="panel form" method="post" action="/setup/consoles">
+  <h2>Add console</h2>
+  <div class="two">
+    <label>Display name
+      <input name="name" placeholder="Optional">
+    </label>
+    <label>UniFi host
+      <div class="input-action-row">
+        <input name="host" placeholder="https://192.168.1.1" required data-unifi-host>
+        <button class="button" type="button" data-detect-host>Detect</button>
+      </div>
+      <span class="field-help" data-detect-host-status></span>
+    </label>
+  </div>
+  <label>Integration API key
+    <div class="secret-field">
+      <input name="api_key" placeholder="Protect API key" type="password" data-secret-input>
+      <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
+    </div>
+  </label>
+  <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
+  <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
+  <button class="button primary" type="submit">Add console</button>
+</form>
+
+<section class="panel">
+  <h2>Encoder status</h2>
+  <p>{{ ffmpeg.message }}</p>
+  <table>
+    <tbody>
+      <tr><th>Source</th><td>{{ ffmpeg.source }}</td></tr>
+      <tr><th>FFmpeg path</th><td><code>{{ ffmpeg.ffmpeg_path or "Missing" }}</code></td></tr>
+      <tr><th>FFprobe path</th><td><code>{{ ffmpeg.ffprobe_path or "Missing" }}</code></td></tr>
+      <tr><th>Apple VideoToolbox HEVC</th><td>{{ "Available" if ffmpeg.has_hevc_videotoolbox else "Missing" }}</td></tr>
+      <tr><th>libx265</th><td>{{ "Available" if ffmpeg.has_libx265 else "Missing" }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

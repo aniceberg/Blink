@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_camera_views.html" as camera_views %}
+{% block title %}Cameras{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div><h1>Cameras</h1><p>Discover cameras from UniFi Protect.</p></div>
+  <div class="actions">
+    {{ camera_views.view_toggle("blink.camerasView") }}
+    <button class="button" type="button" data-refresh-snapshots>Refresh snapshots</button>
+    <form method="post" action="/cameras/refresh"><button class="button primary">Refresh cameras</button></form>
+  </div>
+</section>
+{% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+<div class="panel" data-camera-view-root>
+  {% if cameras %}
+    {{ camera_views.camera_filters(active_consoles, true) }}
+    {{ camera_views.camera_list_table(cameras) }}
+    {{ camera_views.camera_grid(cameras) }}
+  {% else %}
+    <p class="empty">No cameras discovered yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

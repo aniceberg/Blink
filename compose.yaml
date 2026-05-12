@@ -1,0 +1,11 @@
+services:
+  blink:
+    build: .
+    container_name: blink
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      BLINK_DEFAULT_ENCODER: libx265
+    volumes:
+      - ./data:/app/data

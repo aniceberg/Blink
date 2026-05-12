@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Jobs{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div><h1>Jobs</h1><p>Queued, running, and completed timelapse work.</p></div>
+  <a class="button primary" href="/jobs/new">New job</a>
+</section>
+<div class="panel">
+  {% if jobs %}
+    <table>
+      <thead><tr><th>ID</th><th>Cameras</th><th>Status</th><th>Range</th><th>Daily Window</th><th>Interval</th><th>Scale</th><th>Progress</th><th>Created</th><th></th></tr></thead>
+      <tbody>
+        {% for job in jobs %}
+          {% set range_start = job.resolved_start_at or job.start_at %}
+          {% set range_end = job.resolved_end_at or job.end_at %}
+          <tr>
+            <td><a href="/jobs/{{ job.id }}">#{{ job.id }}</a></td>
+            <td>{{ job.camera_names|join(", ") }}</td>
+            <td><span class="status">{{ job.status.value }}</span></td>
+            <td>
+              {% if range_start and range_end %}
+                {{ range_start.strftime("%Y-%m-%d %H:%M:%S") }}<br>
+                {{ range_end.strftime("%Y-%m-%d %H:%M:%S") }}
+              {% else %}
+                <span class="muted">Pending</span>
+              {% endif %}
+            </td>
+            <td>{{ job.daily_start ~ "-" ~ job.daily_end if job.daily_window_enabled else "Full day" }}</td>
+            <td>{{ job.sample_interval_seconds }}s</td>
+            <td>{{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</td>
+            <td>{{ "%.0f"|format(job.progress) }}%</td>
+            <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="cell-actions">
+              {% if job.status.value not in ["queued", "running"] %}
+                <form method="post" action="/jobs/{{ job.id }}/delete" onsubmit="return confirm('Delete job #{{ job.id }} and remove its generated files?');">
+                  <button class="icon-button danger" title="Delete job" aria-label="Delete job #{{ job.id }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M3 6h18"></path>
+                      <path d="M8 6V4h8v2"></path>
+                      <path d="M6 6l1 15h10l1-15"></path>
+                      <path d="M10 11v6"></path>
+                      <path d="M14 11v6"></path>
+                    </svg>
+                  </button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No jobs yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

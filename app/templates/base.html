@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Blink{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/camera_views.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/"><img src="/static/blink-icon.png" alt="" class="brand-icon">Blink</a>
+      <nav>
+        <a href="/jobs/new">New Job</a>
+        <a href="/jobs">Jobs</a>
+        <a href="/setup">Setup</a>
+        <a href="/cameras">Cameras</a>
+      </nav>
+    </header>
+    <main class="shell">
+      {% if not ffmpeg.ok %}
+        <div class="notice error">
+          {{ ffmpeg.message }} HEVC jobs will remain failed until a supported encoder is available.
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

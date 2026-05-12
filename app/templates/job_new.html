@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% import "_camera_views.html" as camera_views %}
+{% block title %}New Timelapse{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div><h1>New timelapse</h1><p>Choose cameras, history range, sampling interval, and HEVC output settings.</p></div>
+</section>
+{% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+<form class="panel form" method="post" action="/jobs/new">
+  <fieldset>
+    <legend>Cameras</legend>
+    <div class="fieldset-head">
+      <span class="fieldset-title">Select cameras</span>
+      <div class="actions">
+        {{ camera_views.view_toggle("blink.cameraPickerView") }}
+        <button class="button" type="button" data-refresh-snapshots>Refresh snapshots</button>
+      </div>
+    </div>
+    {% if cameras %}
+      <div data-camera-view-root>
+        {{ camera_views.camera_filters(active_consoles, false) }}
+        {{ camera_views.camera_picker_list(cameras) }}
+        {{ camera_views.camera_picker_grid(cameras) }}
+      </div>
+    {% else %}
+      <p class="empty">Refresh cameras before creating a job.</p>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>History range</legend>
+    <label class="check"><input type="checkbox" name="earliest_available" data-toggle-earliest-available> Start as far back as Blink can infer</label>
+    <div class="two">
+      <label data-start-date-field>Start date
+        <input type="date" name="start_at">
+      </label>
+      <label>End date
+        <input type="date" name="end_at">
+      </label>
+    </div>
+    <p class="field-help">Without a daily window, Blink uses each full selected day.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Daily window</legend>
+    <label class="check"><input type="checkbox" name="daily_window_enabled" data-toggle-daily-window> Limit each day to a time window</label>
+    <div class="two daily-window-fields" data-daily-window-fields>
+      <label>From
+        <input type="time" name="daily_start" value="{{ defaults.daily_start }}" step="60" disabled>
+      </label>
+      <label>To
+        <input type="time" name="daily_end" value="{{ defaults.daily_end }}" step="60" disabled>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Sampling and output</legend>
+    <div class="three">
+      <label>Frame interval
+        <select name="sample_interval">
+          <option value="1s">1 frame / second</option>
+          <option value="10s">1 frame / 10 seconds</option>
+          <option value="30s">1 frame / 30 seconds</option>
+          <option value="1m" selected>1 frame / minute</option>
+          <option value="5m">1 frame / 5 minutes</option>
+          <option value="15m">1 frame / 15 minutes</option>
+          <option value="30m">1 frame / 30 minutes</option>
+          <option value="1h">1 frame / hour</option>
+          <option value="3h">1 frame / 3 hours</option>
+          <option value="6h">1 frame / 6 hours</option>
+          <option value="12h">1 frame / 12 hours</option>
+          <option value="24h">1 frame / 24 hours</option>
+        </select>
+      </label>
+      <label>Output FPS
+        <input type="number" name="output_fps" min="1" max="120" value="{{ defaults.output_fps }}">
+      </label>
+      <label>HEVC encoder
+        <select name="encoder">
+          <option value="hevc_videotoolbox" {% if defaults.encoder == "hevc_videotoolbox" %}selected{% endif %}>Apple VideoToolbox</option>
+          <option value="libx265" {% if defaults.encoder == "libx265" %}selected{% endif %}>libx265</option>
+        </select>
+      </label>
+    </div>
+    <div class="three">
+      <label>VideoToolbox quality
+        <input type="number" name="videotoolbox_quality" min="0" max="100" value="{{ defaults.videotoolbox_quality }}">
+      </label>
+      <label>x265 CRF
+        <input type="number" name="x265_crf" min="0" max="51" value="{{ defaults.x265_crf }}">
+      </label>
+      <label>x265 preset
+        <select name="x265_preset">
+          {% for preset in ["ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow"] %}
+            <option value="{{ preset }}" {% if preset == defaults.x265_preset %}selected{% endif %}>{{ preset }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="two">
+      <label>Output resolution
+        <select name="output_scale_mode" data-output-scale-mode>
+          <option value="original" selected>Original size</option>
+          <option value="max_3840">4K max width (3840)</option>
+          <option value="max_1920">1080p max width (1920)</option>
+          <option value="max_1280">720p max width (1280)</option>
+          <option value="custom">Custom max width</option>
+        </select>
+      </label>
+      <label data-output-scale-custom class="disabled-field">Custom max width
+        <input type="number" name="output_scale_width" min="64" max="8192" step="2" placeholder="2560" disabled>
+      </label>
+    </div>
+  </fieldset>
+  <button class="button primary" {% if not cameras %}disabled{% endif %}>Queue timelapse</button>
+</form>
+{% endblock %}

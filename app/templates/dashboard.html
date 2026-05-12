@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_camera_views.html" as camera_views %}
+{% block title %}Blink Dashboard{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>Historical UniFi timelapses</h1>
+    <p>Sample recorded camera history into HEVC timelapse videos.</p>
+  </div>
+  <a class="button primary" href="/jobs/new">Create timelapse</a>
+</section>
+
+<section class="metrics">
+  <div><span>{{ cameras|length }}</span><label>Cameras</label></div>
+  <div><span>{{ jobs|length }}</span><label>Recent jobs</label></div>
+  <div><span>{{ "VideoToolbox" if ffmpeg.has_hevc_videotoolbox else ("libx265" if ffmpeg.has_libx265 else "Missing") }}</span><label>HEVC encoder</label></div>
+</section>
+
+<section class="split">
+  <div>
+    <div class="section-title">
+      <h2>Cameras</h2>
+      <div class="actions">
+        {{ camera_views.view_toggle("blink.dashboardCamerasView") }}
+        <button class="button" type="button" data-refresh-snapshots>Snapshots</button>
+        <form method="post" action="/cameras/refresh"><button class="button">Refresh</button></form>
+      </div>
+    </div>
+    <div class="panel" data-camera-view-root>
+      {% if cameras %}
+        {{ camera_views.camera_list_table(cameras) }}
+        {{ camera_views.camera_grid(cameras) }}
+      {% else %}
+        <p class="empty">No cameras discovered yet. Configure setup and refresh cameras.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="section-title"><h2>Recent jobs</h2><a href="/jobs">View all</a></div>
+    <div class="panel">
+      {% if jobs %}
+        <table>
+          <thead><tr><th>ID</th><th>Cameras</th><th>Status</th><th>Progress</th></tr></thead>
+          <tbody>
+            {% for job in jobs %}
+              <tr>
+                <td><a href="/jobs/{{ job.id }}">#{{ job.id }}</a></td>
+                <td>{{ job.camera_names|join(", ") }}</td>
+                <td><span class="status">{{ job.status.value }}</span></td>
+                <td>{{ "%.0f"|format(job.progress) }}%</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="empty">No jobs yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
