@@ -34,7 +34,10 @@ class UniFiClient:
         return headers
 
     def _private_headers(self, accept: str = "application/json") -> dict[str, str]:
-        return {"Accept": accept}
+        headers = {"Accept": accept}
+        if self.settings.api_key:
+            headers["X-API-KEY"] = self.settings.api_key
+        return headers
 
     async def _client(self) -> httpx.AsyncClient:
         ensure_importlib_resources()
