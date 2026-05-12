@@ -68,6 +68,22 @@
               </button>
             </div>
           </label>
+          <div class="two">
+            <label>Username
+              <input name="username" value="{{ console.username }}" placeholder="admin" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </label>
+            <label>Password
+              <div class="secret-field">
+                <input name="password" value="{{ console.password }}" placeholder="Password" type="password" required data-secret-input>
+                <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </label>
+          </div>
           <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
           <div class="actions">
             <button class="button primary" type="submit">Save console</button>
@@ -107,6 +123,22 @@
       </button>
     </div>
   </label>
+  <div class="two">
+    <label>Username
+      <input name="username" placeholder="admin" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <label>Password
+      <div class="secret-field">
+        <input name="password" placeholder="Password" type="password" required data-secret-input>
+        <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+    </label>
+  </div>
   <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
   <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
   <button class="button primary" type="submit">Add console</button>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -34,6 +35,7 @@ from app.services.ffmpeg import check_ffmpeg
 from app.services.jobs import JobRunner, describe_output_scale
 from app.services.snapshots import SnapshotCache
 from app.services.unifi import UniFiClient
+from app.services.updater import check_for_update, get_cached_update
 from app.store import Store
 from app.utils import (
     detect_default_gateway,
@@ -43,6 +45,8 @@ from app.utils import (
     parse_interval,
     parse_submitted_date,
 )
+
+from app import __version__ as APP_VERSION
 
 ensure_data_dirs()
 ensure_importlib_resources()
@@ -56,6 +60,7 @@ templates.env.cache = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     runner.start()
+    asyncio.create_task(check_for_update(APP_VERSION))
     yield
     await runner.stop()
 
@@ -90,6 +95,8 @@ def context(request: Request, **kwargs):
             "output_scale_width": None,
         },
         "describe_output_scale": describe_output_scale,
+        "app_version": APP_VERSION,
+        "update": get_cached_update(),
         **kwargs,
     }
 
@@ -266,8 +273,19 @@ async def setup_post(
     return render(request, "setup.html", saved=True, error=None, timezones=_timezones)
 
 
+async def _validate_console_credentials(host: str, api_key: str, username: str, password: str, verify_ssl: bool) -> str | None:
+    from types import SimpleNamespace
+    settings = SimpleNamespace(host=host, api_key=api_key, username=username or None, password=password or None, verify_ssl=verify_ssl)
+    try:
+        await UniFiClient(settings).test_login()
+    except Exception as exc:
+        return str(exc)
+    return None
+
+
 @app.post("/setup/consoles")
 async def setup_console_create(
+    request: Request,
     name: str = Form(""),
     host: str = Form(...),
     api_key: str = Form(""),
@@ -276,6 +294,9 @@ async def setup_console_create(
     verify_ssl: str | None = Form(None),
     enabled: str | None = Form("on"),
 ):
+    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl))
+    if cred_error:
+        return render(request, "setup.html", saved=False, error=f"Console credentials invalid: {cred_error}", timezones=_timezones)
     store.create_console(
         {
             "name": name,
@@ -292,6 +313,7 @@ async def setup_console_create(
 
 @app.post("/setup/consoles/{console_id}")
 async def setup_console_update(
+    request: Request,
     console_id: int,
     name: str = Form(""),
     host: str = Form(...),
@@ -303,6 +325,9 @@ async def setup_console_update(
 ):
     if not store.get_console(console_id):
         raise HTTPException(status_code=404)
+    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl))
+    if cred_error:
+        return render(request, "setup.html", saved=False, error=f"Console credentials invalid: {cred_error}", timezones=_timezones)
     store.update_console(
         console_id,
         {

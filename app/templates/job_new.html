@@ -18,7 +18,7 @@
     </div>
     {% if cameras %}
       <div data-camera-view-root>
-        {{ camera_views.camera_filters(active_consoles, false) }}
+        {{ camera_views.camera_filters(active_consoles, true) }}
         {{ camera_views.camera_picker_list(cameras) }}
         {{ camera_views.camera_picker_grid(cameras) }}
       </div>

@@ -43,6 +43,12 @@ class UniFiClient:
         ensure_importlib_resources()
         return httpx.AsyncClient(verify=self.settings.verify_ssl, timeout=httpx.Timeout(60.0), follow_redirects=True)
 
+    async def test_login(self) -> None:
+        if not (self.settings.username and self.settings.password):
+            raise UniFiError("Username and password are required.")
+        async with await self._client() as client:
+            await self.login_private_api(client)
+
     async def login_private_api(self, client: httpx.AsyncClient) -> None:
         if self._cookies or not (self.settings.username and self.settings.password):
             if self._cookies:
@@ -85,16 +91,17 @@ class UniFiClient:
     async def download_recording_snapshot(self, camera_id: str, timestamp: datetime, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         ts_ms = int(timestamp.timestamp() * 1000)
-        url = self._protect_url(f"/cameras/{camera_id}/recording-snapshot")
+        private_url = self._protect_url(f"/cameras/{camera_id}/recording-snapshot")
+        integration_url = self._integration_url(f"/cameras/{camera_id}/snapshot")
         candidates = [
-            (url, {"ts": ts_ms}),
-            (url, {"start": ts_ms - 500, "end": ts_ms + 500}),
+            (private_url, {"ts": ts_ms}, self._private_headers("image/jpeg")),
+            (private_url, {"start": ts_ms - 500, "end": ts_ms + 500}, self._private_headers("image/jpeg")),
         ]
         async with await self._client() as client:
             await self.login_private_api(client)
             attempt_errors: list[str] = []
-            for url, params in candidates:
-                response = await client.get(url, params=params, headers=self._private_headers("image/jpeg"))
+            for url, params, headers in candidates:
+                response = await client.get(url, params=params, headers=headers)
                 if response.status_code == 200 and response.headers.get("content-type", "").startswith("image/"):
                     output_path.write_bytes(response.content)
                     if output_path.stat().st_size < 1000:
@@ -108,15 +115,15 @@ class UniFiClient:
         start_ms = int(start_at.timestamp() * 1000)
         end_ms = int(end_at.timestamp() * 1000)
         candidates = [
-            (self._protect_url("/video/export"), {"camera": camera_id, "start": start_ms, "end": end_ms}),
-            (self._protect_url("/video/export"), {"camera": camera_id, "startTime": start_ms, "endTime": end_ms}),
-            (self._protect_url(f"/cameras/{camera_id}/video/export"), {"start": start_ms, "end": end_ms}),
+            (self._protect_url("/video/export"), {"camera": camera_id, "start": start_ms, "end": end_ms}, self._private_headers("video/mp4")),
+            (self._protect_url("/video/export"), {"camera": camera_id, "startTime": start_ms, "endTime": end_ms}, self._private_headers("video/mp4")),
+            (self._protect_url(f"/cameras/{camera_id}/video/export"), {"start": start_ms, "end": end_ms}, self._private_headers("video/mp4")),
         ]
         async with await self._client() as client:
             await self.login_private_api(client)
             attempt_errors: list[str] = []
-            for url, params in candidates:
-                response = await client.get(url, params=params, headers=self._private_headers("video/mp4"))
+            for url, params, headers in candidates:
+                response = await client.get(url, params=params, headers=headers)
                 if response.status_code == 200 and response.content:
                     output_path.write_bytes(response.content)
                     if output_path.stat().st_size < 1000:

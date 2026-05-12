@@ -27,7 +27,7 @@ a:hover { text-decoration: underline; }
   height: 64px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 0 28px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -37,8 +37,12 @@ a:hover { text-decoration: underline; }
 }
 .brand { color: var(--text); font-weight: 760; font-size: 20px; letter-spacing: 0; display: flex; align-items: center; gap: 8px; }
 .brand-icon { width: 24px; height: 24px; object-fit: contain; }
-nav { display: flex; gap: 20px; }
+.version-badge { color: var(--muted); font-size: 12px; font-weight: 600; }
+.update-badge { font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+.update-badge:hover { background: var(--accent-strong); text-decoration: none; }
+nav { margin-left: auto; display: flex; align-items: center; gap: 20px; }
 nav a { color: var(--muted); font-weight: 620; font-size: 14px; }
+.nav-icon-link { display: flex; align-items: center; }
 .shell { max-width: 1180px; margin: 0 auto; padding: 34px 24px 60px; }
 .page-head {
   display: flex;
@@ -515,12 +519,16 @@ input, select {
 }
 .error-box {
   white-space: pre-wrap;
+  -webkit-user-select: text;
+  user-select: text;
   background: #fff6f5;
   color: var(--danger);
   border: 1px solid #efc6c0;
   padding: 12px;
   border-radius: 7px;
 }
+th, td { -webkit-user-select: text; user-select: text; }
+code { -webkit-user-select: text; user-select: text; }
 @media (max-width: 780px) {
   .topbar { align-items: flex-start; height: auto; padding: 16px; flex-direction: column; gap: 12px; }
   nav { flex-wrap: wrap; gap: 12px; }
