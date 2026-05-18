@@ -528,6 +528,15 @@ input, select {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
+.estimated-length {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #f3f7fa;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
 .error-box {
   white-space: pre-wrap;
   -webkit-user-select: text;

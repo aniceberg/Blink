@@ -145,8 +145,101 @@
     setupEarliestAvailableControls();
     setupOutputScaleControls();
     setupFrameHoldPreview();
+    setupEstimatedLength();
     setupSetupControls();
     startJobStatusPolling();
+  }
+
+  function setupEstimatedLength() {
+    const display = document.querySelector("[data-estimated-length]");
+    const text = document.querySelector("[data-estimated-length-text]");
+    if (!display || !text) return;
+
+    function compute() {
+      const earliest = document.querySelector("[data-toggle-earliest-available]")?.checked;
+      const startVal = document.querySelector('[name="start_at"]')?.value;
+      const endVal = document.querySelector('[name="end_at"]')?.value;
+
+      if (earliest) {
+        text.textContent = "Estimated length: unavailable (earliest available start date unknown)";
+        display.hidden = false;
+        return;
+      }
+      if (!startVal || !endVal) {
+        display.hidden = true;
+        return;
+      }
+
+      const start = new Date(startVal);
+      const end = new Date(endVal);
+      if (end < start) {
+        display.hidden = true;
+        return;
+      }
+
+      const numDays = Math.round((end - start) / 86_400_000) + 1;
+
+      const dailyEnabled = document.querySelector('[name="daily_window_enabled"]')?.checked;
+      let windowSeconds;
+      if (dailyEnabled) {
+        const ds = document.querySelector('[name="daily_start"]')?.value;
+        const de = document.querySelector('[name="daily_end"]')?.value;
+        if (!ds || !de) {
+          display.hidden = true;
+          return;
+        }
+        const [sh, sm] = ds.split(":").map(Number);
+        const [eh, em] = de.split(":").map(Number);
+        windowSeconds = (eh * 60 + em - (sh * 60 + sm)) * 60;
+        if (windowSeconds <= 0) {
+          display.hidden = true;
+          return;
+        }
+      } else {
+        windowSeconds = 86_400;
+      }
+
+      const amount = Math.max(1, parseInt(document.querySelector("[data-interval-amount]")?.value || "1", 10));
+      const unit = document.querySelector("[data-interval-unit]")?.value || "minute";
+      const unitSeconds = { second: 1, minute: 60, hour: 3600, day: 86_400 };
+      const intervalSec = amount * (unitSeconds[unit] ?? 60);
+      if (intervalSec <= 0) {
+        display.hidden = true;
+        return;
+      }
+
+      const fps = Math.max(1, parseInt(document.querySelector("[data-output-fps]")?.value || "30", 10));
+      const repeat = Math.max(1, parseInt(document.querySelector("[data-frame-repeat]")?.value || "1", 10));
+
+      const totalFrames = (numDays * windowSeconds / intervalSec) * repeat;
+      const videoSeconds = totalFrames / fps;
+
+      const h = Math.floor(videoSeconds / 3600);
+      const m = Math.floor((videoSeconds % 3600) / 60);
+      const s = Math.floor(videoSeconds % 60);
+      const hms = [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+
+      text.textContent = `Estimated video: ${hms}  (${Math.round(totalFrames).toLocaleString()} output frames, assuming full availability)`;
+      display.hidden = false;
+    }
+
+    const selectors = [
+      '[name="start_at"]',
+      '[name="end_at"]',
+      "[data-toggle-earliest-available]",
+      '[name="daily_window_enabled"]',
+      '[name="daily_start"]',
+      '[name="daily_end"]',
+      "[data-interval-amount]",
+      "[data-interval-unit]",
+      "[data-output-fps]",
+      "[data-frame-repeat]",
+    ];
+    selectors.forEach((sel) => {
+      document.querySelector(sel)?.addEventListener("input", compute);
+      document.querySelector(sel)?.addEventListener("change", compute);
+    });
+    compute();
   }
 
   function setupFrameHoldPreview() {
