@@ -85,6 +85,8 @@ class Store:
                     password TEXT,
                     verify_ssl INTEGER NOT NULL DEFAULT 0,
                     enabled INTEGER NOT NULL DEFAULT 1,
+                    connection_type TEXT NOT NULL DEFAULT 'DIRECT',
+                    host_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -108,6 +110,7 @@ class Store:
                     x265_preset TEXT NOT NULL,
                     output_scale_mode TEXT NOT NULL DEFAULT 'original',
                     output_scale_width INTEGER,
+                    frame_repeat INTEGER NOT NULL DEFAULT 1,
                     progress REAL NOT NULL DEFAULT 0,
                     planned_frame_count INTEGER NOT NULL DEFAULT 0,
                     processed_frame_count INTEGER NOT NULL DEFAULT 0,
@@ -158,6 +161,9 @@ class Store:
             self._ensure_column(conn, "jobs", "finished_at", "TEXT")
             self._ensure_column(conn, "jobs", "resolved_start_at", "TEXT")
             self._ensure_column(conn, "jobs", "resolved_end_at", "TEXT")
+            self._ensure_column(conn, "jobs", "frame_repeat", "INTEGER NOT NULL DEFAULT 1")
+            self._ensure_column(conn, "consoles", "connection_type", "TEXT NOT NULL DEFAULT 'DIRECT'")
+            self._ensure_column(conn, "consoles", "host_id", "TEXT")
             row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
             if row is None:
                 conn.execute("INSERT INTO settings (id, updated_at) VALUES (1, ?)", (utc_now(),))
@@ -277,13 +283,14 @@ class Store:
 
     def create_console(self, data: dict[str, Any]) -> int:
         now = utc_now()
-        host = data.get("host", "").rstrip("/")
+        connection_type = data.get("connection_type", "DIRECT")
+        host = data.get("host", "").rstrip("/") or ("https://api.ui.com" if connection_type == "SITE_MANAGER" else "")
         name = (data.get("name") or console_name_from_host(host)).strip()
         with self.connect() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO consoles (name, host, api_key, username, password, verify_ssl, enabled, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO consoles (name, host, api_key, username, password, verify_ssl, enabled, connection_type, host_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
@@ -293,6 +300,8 @@ class Store:
                     data.get("password") or None,
                     1 if data.get("verify_ssl") else 0,
                     1 if data.get("enabled", True) else 0,
+                    connection_type,
+                    data.get("host_id") or None,
                     now,
                     now,
                 ),
@@ -300,13 +309,14 @@ class Store:
             return int(cur.lastrowid)
 
     def update_console(self, console_id: int, data: dict[str, Any]) -> None:
-        host = data.get("host", "").rstrip("/")
+        connection_type = data.get("connection_type", "DIRECT")
+        host = data.get("host", "").rstrip("/") or ("https://api.ui.com" if connection_type == "SITE_MANAGER" else "")
         name = (data.get("name") or console_name_from_host(host)).strip()
         with self.connect() as conn:
             conn.execute(
                 """
                 UPDATE consoles
-                SET name = ?, host = ?, api_key = ?, username = ?, password = ?, verify_ssl = ?, enabled = ?, updated_at = ?
+                SET name = ?, host = ?, api_key = ?, username = ?, password = ?, verify_ssl = ?, enabled = ?, connection_type = ?, host_id = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -317,6 +327,8 @@ class Store:
                     data.get("password") or None,
                     1 if data.get("verify_ssl") else 0,
                     1 if data.get("enabled") else 0,
+                    connection_type,
+                    data.get("host_id") or None,
                     utc_now(),
                     console_id,
                 ),
@@ -401,9 +413,9 @@ class Store:
                     INSERT INTO jobs (
                     status, camera_ids_json, camera_names_json, start_at, end_at, earliest_available,
                     daily_window_enabled, daily_start, daily_end, sample_interval_seconds, output_fps, encoder,
-                    videotoolbox_quality, x265_crf, x265_preset, output_scale_mode, output_scale_width,
+                    videotoolbox_quality, x265_crf, x265_preset, output_scale_mode, output_scale_width, frame_repeat,
                     progress, message, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
                 """,
                 (
                     JobStatus.QUEUED.value,
@@ -423,6 +435,7 @@ class Store:
                     data["x265_preset"],
                     data.get("output_scale_mode", "original"),
                     data.get("output_scale_width"),
+                    data.get("frame_repeat", 1),
                     "Queued",
                     now,
                     now,
@@ -527,6 +540,7 @@ class Store:
             conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
 
     def _row_to_console(self, row: sqlite3.Row) -> Console:
+        keys = row.keys()
         return Console(
             id=row["id"],
             name=row["name"],
@@ -536,6 +550,8 @@ class Store:
             password=row["password"],
             verify_ssl=bool(row["verify_ssl"]),
             enabled=bool(row["enabled"]),
+            connection_type=row["connection_type"] if "connection_type" in keys else "DIRECT",
+            host_id=row["host_id"] if "host_id" in keys else None,
             created_at=parse_dt(row["created_at"]),
             updated_at=parse_dt(row["updated_at"]),
         )
@@ -576,6 +592,7 @@ class Store:
             x265_preset=row["x265_preset"],
             output_scale_mode=row["output_scale_mode"],
             output_scale_width=row["output_scale_width"],
+            frame_repeat=row["frame_repeat"] if "frame_repeat" in row.keys() else 1,
             progress=row["progress"],
             planned_frame_count=row["planned_frame_count"],
             processed_frame_count=row["processed_frame_count"],

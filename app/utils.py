@@ -7,7 +7,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-SIMPLE_INTERVAL_RE = re.compile(r"^\s*(\d+)\s*([smh]|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours)\s*$", re.I)
+SIMPLE_INTERVAL_RE = re.compile(r"^\s*(\d+)\s*([smhd]|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours|day|days)\s*$", re.I)
 FRAMES_PER_RE = re.compile(r"^\s*(\d+)\s*(?:frame|frames)\s*(?:per|/)\s*(?:(\d+)\s*)?([smh]|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours)\s*$", re.I)
 GATEWAY_RE = re.compile(r"^\s*gateway:\s*([0-9a-fA-F:.]+)\s*$", re.M)
 
@@ -42,10 +42,12 @@ def parse_interval(value: str | int) -> int:
                 seconds = amount * 60
             elif unit in {"h", "hour", "hours"}:
                 seconds = amount * 3600
+            elif unit in {"d", "day", "days"}:
+                seconds = amount * 86400
             else:
                 raise ValueError("Unsupported interval unit.")
-    if seconds < 1 or seconds > 86400:
-        raise ValueError("Interval must be between 1 second and 24 hours.")
+    if seconds < 1 or seconds > 604800:
+        raise ValueError("Interval must be between 1 second and 7 days.")
     return seconds
 
 

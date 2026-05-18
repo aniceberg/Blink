@@ -58,23 +58,18 @@
     <legend>Sampling and output</legend>
     <div class="three">
       <label>Frame interval
-        <select name="sample_interval">
-          <option value="1s">1 frame / second</option>
-          <option value="10s">1 frame / 10 seconds</option>
-          <option value="30s">1 frame / 30 seconds</option>
-          <option value="1m" selected>1 frame / minute</option>
-          <option value="5m">1 frame / 5 minutes</option>
-          <option value="15m">1 frame / 15 minutes</option>
-          <option value="30m">1 frame / 30 minutes</option>
-          <option value="1h">1 frame / hour</option>
-          <option value="3h">1 frame / 3 hours</option>
-          <option value="6h">1 frame / 6 hours</option>
-          <option value="12h">1 frame / 12 hours</option>
-          <option value="24h">1 frame / 24 hours</option>
-        </select>
+        <div class="input-unit-row">
+          <input type="number" name="interval_amount" value="1" min="1" max="9999" data-interval-amount>
+          <select name="interval_unit" data-interval-unit>
+            <option value="second">second</option>
+            <option value="minute" selected>minute</option>
+            <option value="hour">hour</option>
+            <option value="day">day</option>
+          </select>
+        </div>
       </label>
       <label>Output FPS
-        <input type="number" name="output_fps" min="1" max="120" value="{{ defaults.output_fps }}">
+        <input type="number" name="output_fps" min="1" max="120" value="{{ defaults.output_fps }}" data-output-fps>
       </label>
       <label>HEVC encoder
         <select name="encoder">
@@ -96,6 +91,12 @@
             <option value="{{ preset }}" {% if preset == defaults.x265_preset %}selected{% endif %}>{{ preset }}</option>
           {% endfor %}
         </select>
+      </label>
+    </div>
+    <div class="two">
+      <label>Frame hold
+        <input type="number" name="frame_repeat" min="1" max="3600" value="1" data-frame-repeat>
+        <span class="field-help" data-frame-hold-preview></span>
       </label>
     </div>
     <div class="two">

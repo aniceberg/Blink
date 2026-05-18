@@ -176,6 +176,7 @@ class JobRunner:
                 x265_crf=job.x265_crf or DEFAULT_X265_CRF,
                 x265_preset=job.x265_preset or DEFAULT_X265_PRESET,
                 scale_max_width=job.output_scale_width,
+                frame_repeat=job.frame_repeat or 1,
                 output_dir=resolve_output_dir(settings.output_dir),
                 metadata=self._video_metadata(job, start_at, end_at),
                 should_cancel=is_canceled,

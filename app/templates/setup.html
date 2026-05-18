@@ -144,6 +144,29 @@
   <button class="button primary" type="submit">Add console</button>
 </form>
 
+<form class="panel form" method="post" action="/setup/consoles">
+  <h2>Add console via Site Manager (cloud)</h2>
+  <p>Connect a console that's only reachable through Ubiquiti's cloud. Get your UI API key from <strong>ui.com → Account → API Keys</strong>.</p>
+  <input type="hidden" name="connection_type" value="SITE_MANAGER">
+  <input type="hidden" name="host_id" value="" data-sm-host-id-field>
+  <input type="hidden" name="host" value="">
+  <div class="two">
+    <label>Display name
+      <input name="name" placeholder="Optional" data-sm-name-field>
+    </label>
+    <label>UI API key
+      <div class="input-action-row">
+        <input name="api_key" placeholder="UI API key from ui.com" autocomplete="off" spellcheck="false" data-site-manager-api-key>
+        <button class="button" type="button" data-discover-site-manager>Discover</button>
+      </div>
+    </label>
+  </div>
+  <div data-site-manager-results></div>
+  <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
+  <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
+  <button class="button primary" type="submit">Add console</button>
+</form>
+
 <section class="panel">
   <h2>Encoder status</h2>
   <p>{{ ffmpeg.message }}</p>

@@ -144,8 +144,27 @@
     setupDailyWindowControls();
     setupEarliestAvailableControls();
     setupOutputScaleControls();
+    setupFrameHoldPreview();
     setupSetupControls();
     startJobStatusPolling();
+  }
+
+  function setupFrameHoldPreview() {
+    const repeatInput = document.querySelector("[data-frame-repeat]");
+    const fpsInput = document.querySelector("[data-output-fps]");
+    const preview = document.querySelector("[data-frame-hold-preview]");
+    if (!repeatInput || !preview) return;
+
+    function update() {
+      const repeat = Math.max(1, parseInt(repeatInput.value, 10) || 1);
+      const fps = Math.max(1, parseInt(fpsInput ? fpsInput.value : "30", 10) || 30);
+      const secs = repeat / fps;
+      preview.textContent = `= ${secs.toFixed(2)} s per frame at ${fps}fps`;
+    }
+
+    repeatInput.addEventListener("input", update);
+    if (fpsInput) fpsInput.addEventListener("input", update);
+    update();
   }
 
   function closeVideoModal() {
@@ -267,6 +286,68 @@
       button.dataset.outputDirBound = "1";
       button.addEventListener("click", chooseOutputDirectory);
     });
+
+    document.querySelectorAll("[data-discover-site-manager]").forEach((button) => {
+      if (button.dataset.siteManagerBound === "1") return;
+      button.dataset.siteManagerBound = "1";
+      button.addEventListener("click", discoverSiteManagerHosts);
+    });
+  }
+
+  async function discoverSiteManagerHosts(event) {
+    const button = event.currentTarget;
+    const form = button.closest("form") || button.closest(".panel") || document;
+    const apiKeyInput = form.querySelector("[data-site-manager-api-key]");
+    const resultContainer = form.querySelector("[data-site-manager-results]");
+    if (!apiKeyInput || !resultContainer) return;
+
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) {
+      resultContainer.innerHTML = '<p class="notice error">Enter a UI API key first.</p>';
+      return;
+    }
+
+    button.disabled = true;
+    resultContainer.innerHTML = '<p class="field-help">Discovering consoles...</p>';
+
+    try {
+      const response = await fetch(`/setup/site-manager/hosts?api_key=${encodeURIComponent(apiKey)}`, {
+        headers: { Accept: "application/json" },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Discovery failed.");
+
+      const hosts = data.hosts || [];
+      if (hosts.length === 0) {
+        resultContainer.innerHTML = '<p class="field-help">No Protect-enabled consoles found for this API key.</p>';
+        return;
+      }
+
+      const items = hosts
+        .map(
+          (h) => `
+        <label class="check">
+          <input type="radio" name="_sm_host_pick" value="${h.hostId}"
+            data-sm-host-id="${h.hostId}" data-sm-host-name="${h.displayName}">
+          ${h.displayName}${h.hostname ? ` <span class="muted">(${h.hostname})</span>` : ""}
+        </label>`
+        )
+        .join("");
+      resultContainer.innerHTML = `<div style="display:grid;gap:8px;margin-top:4px">${items}</div>`;
+
+      resultContainer.querySelectorAll("input[type=radio][name=_sm_host_pick]").forEach((radio) => {
+        radio.addEventListener("change", () => {
+          const hiddenId = form.querySelector("[data-sm-host-id-field]");
+          const nameInput = form.querySelector("[data-sm-name-field]");
+          if (hiddenId) hiddenId.value = radio.dataset.smHostId;
+          if (nameInput && !nameInput.value) nameInput.value = radio.dataset.smHostName;
+        });
+      });
+    } catch (error) {
+      resultContainer.innerHTML = `<div class="notice error">${error.message || "Could not reach the Site Manager API."}</div>`;
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function detectHost(event) {
@@ -333,6 +414,29 @@
     }
   }
 
+  function rebuildFrameTable(container, frames) {
+    if (!frames || frames.length === 0) {
+      container.innerHTML = '<p class="empty">No frames recorded yet.</p>';
+      return;
+    }
+    const rows = frames
+      .map(
+        (f) =>
+          `<tr>
+            <td>${f.requested_at || ""}</td>
+            <td><code>${f.camera_id || ""}</code></td>
+            <td><span class="status ${f.status === "success" ? "ok" : "bad"}">${f.status || ""}</span></td>
+            <td>${f.source_method || ""}</td>
+            <td>${f.error || ""}</td>
+          </tr>`
+      )
+      .join("");
+    container.innerHTML = `<table>
+      <thead><tr><th>Requested</th><th>Camera</th><th>Status</th><th>Source</th><th>Error</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
   function startJobStatusPolling() {
     stopJobStatusPolling();
     const panel = document.querySelector("[data-job-status-url]");
@@ -347,6 +451,10 @@
     const rangeEnd = panel.querySelector("[data-job-range-end]");
     const dailyWindow = panel.querySelector("[data-job-daily-window]");
     const counts = panel.querySelector("[data-job-counts]");
+    const framesSection = document.querySelector("[data-frames-url]");
+    const framesBody = framesSection ? framesSection.querySelector("[data-frames-body]") : null;
+    const framesUrl = framesSection ? framesSection.dataset.framesUrl : null;
+    let tickCount = 0;
 
     async function refresh() {
       const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -365,6 +473,16 @@
       return data.status === "queued" || data.status === "running";
     }
 
+    async function refreshFrames() {
+      if (!framesUrl || !framesBody) return;
+      try {
+        const response = await fetch(framesUrl, { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+        const data = await response.json();
+        rebuildFrameTable(framesBody, data.frames);
+      } catch (_) {}
+    }
+
     if (panel.dataset.jobActive !== "1") {
       refresh();
       return;
@@ -373,8 +491,13 @@
     refresh();
     jobStatusTimer = window.setInterval(async () => {
       try {
+        tickCount++;
         const keepGoing = await refresh();
-        if (!keepGoing) stopJobStatusPolling();
+        if (tickCount % 5 === 0) await refreshFrames();
+        if (!keepGoing) {
+          stopJobStatusPolling();
+          window.location.reload();
+        }
       } catch (_error) {
         stopJobStatusPolling();
       }

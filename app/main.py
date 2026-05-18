@@ -34,6 +34,7 @@ from app.paths import resolve_output_dir
 from app.services.ffmpeg import check_ffmpeg
 from app.services.jobs import JobRunner, describe_output_scale
 from app.services.snapshots import SnapshotCache
+from app.services.site_manager import list_hosts as sm_list_hosts
 from app.services.unifi import UniFiClient
 from app.services.updater import check_for_update, get_cached_update
 from app.store import Store
@@ -74,6 +75,19 @@ async def favicon():
     return Response(status_code=204)
 
 
+def format_interval(seconds: int) -> str:
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''}"
+    if seconds < 3600:
+        m = seconds // 60
+        return f"{m} minute{'s' if m != 1 else ''}"
+    if seconds < 86400:
+        h = seconds // 3600
+        return f"{h} hour{'s' if h != 1 else ''}"
+    d = seconds // 86400
+    return f"{d} day{'s' if d != 1 else ''}"
+
+
 def context(request: Request, **kwargs):
     settings = store.get_settings()
     return {
@@ -95,6 +109,7 @@ def context(request: Request, **kwargs):
             "output_scale_width": None,
         },
         "describe_output_scale": describe_output_scale,
+        "format_interval": format_interval,
         "app_version": APP_VERSION,
         "update": get_cached_update(),
         **kwargs,
@@ -140,6 +155,7 @@ def job_status_payload(job) -> dict:
         "output_scale": describe_output_scale(job.output_scale_mode, job.output_scale_width),
         "planned_frame_count": job.planned_frame_count,
         "processed_frame_count": job.processed_frame_count,
+        "output_path": job.output_path,
     }
 
 
@@ -273,9 +289,23 @@ async def setup_post(
     return render(request, "setup.html", saved=True, error=None, timezones=_timezones)
 
 
-async def _validate_console_credentials(host: str, api_key: str, username: str, password: str, verify_ssl: bool) -> str | None:
+async def _validate_console_credentials(
+    host: str, api_key: str, username: str, password: str, verify_ssl: bool,
+    connection_type: str = "DIRECT", host_id: str = "",
+) -> str | None:
     from types import SimpleNamespace
-    settings = SimpleNamespace(host=host, api_key=api_key, username=username or None, password=password or None, verify_ssl=verify_ssl)
+    if connection_type == "SITE_MANAGER":
+        try:
+            hosts = await sm_list_hosts(api_key)
+            if host_id and not any(h["hostId"] == host_id for h in hosts):
+                return f"Host '{host_id}' not found in this Site Manager account."
+        except Exception as exc:
+            return str(exc)
+        return None
+    settings = SimpleNamespace(
+        host=host, api_key=api_key, username=username or None, password=password or None,
+        verify_ssl=verify_ssl, connection_type="DIRECT", host_id=None,
+    )
     try:
         await UniFiClient(settings).test_login()
     except Exception as exc:
@@ -283,18 +313,30 @@ async def _validate_console_credentials(host: str, api_key: str, username: str, 
     return None
 
 
+@app.get("/setup/site-manager/hosts")
+async def setup_site_manager_hosts(api_key: str = Query(...)):
+    try:
+        hosts = await sm_list_hosts(api_key)
+        protect_hosts = [h for h in hosts if "protect" in h.get("applications", [])]
+        return JSONResponse({"ok": True, "hosts": protect_hosts})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)
+
+
 @app.post("/setup/consoles")
 async def setup_console_create(
     request: Request,
     name: str = Form(""),
-    host: str = Form(...),
+    host: str = Form(""),
     api_key: str = Form(""),
     username: str = Form(""),
     password: str = Form(""),
     verify_ssl: str | None = Form(None),
     enabled: str | None = Form("on"),
+    connection_type: str = Form("DIRECT"),
+    host_id: str = Form(""),
 ):
-    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl))
+    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl), connection_type, host_id)
     if cred_error:
         return render(request, "setup.html", saved=False, error=f"Console credentials invalid: {cred_error}", timezones=_timezones)
     store.create_console(
@@ -306,6 +348,8 @@ async def setup_console_create(
             "password": password,
             "verify_ssl": bool(verify_ssl),
             "enabled": bool(enabled),
+            "connection_type": connection_type,
+            "host_id": host_id or None,
         }
     )
     return RedirectResponse("/setup", status_code=303)
@@ -316,16 +360,18 @@ async def setup_console_update(
     request: Request,
     console_id: int,
     name: str = Form(""),
-    host: str = Form(...),
+    host: str = Form(""),
     api_key: str = Form(""),
     username: str = Form(""),
     password: str = Form(""),
     verify_ssl: str | None = Form(None),
     enabled: str | None = Form(None),
+    connection_type: str = Form("DIRECT"),
+    host_id: str = Form(""),
 ):
     if not store.get_console(console_id):
         raise HTTPException(status_code=404)
-    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl))
+    cred_error = await _validate_console_credentials(host, api_key, username, password, bool(verify_ssl), connection_type, host_id)
     if cred_error:
         return render(request, "setup.html", saved=False, error=f"Console credentials invalid: {cred_error}", timezones=_timezones)
     store.update_console(
@@ -338,6 +384,8 @@ async def setup_console_update(
             "password": password,
             "verify_ssl": bool(verify_ssl),
             "enabled": bool(enabled),
+            "connection_type": connection_type,
+            "host_id": host_id or None,
         },
     )
     return RedirectResponse("/setup", status_code=303)
@@ -434,7 +482,9 @@ async def job_new_post(
     daily_window_enabled: str | None = Form(None),
     daily_start: str = Form(DEFAULT_DAILY_START),
     daily_end: str = Form(DEFAULT_DAILY_END),
-    sample_interval: str = Form("1m"),
+    interval_amount: int = Form(1),
+    interval_unit: str = Form("minute"),
+    frame_repeat: int = Form(1),
     output_fps: int = Form(DEFAULT_OUTPUT_FPS),
     encoder: str = Form(DEFAULT_ENCODER),
     videotoolbox_quality: int = Form(DEFAULT_VIDEOTOOLBOX_QUALITY),
@@ -456,7 +506,10 @@ async def job_new_post(
         )
         effective_daily_start = daily_start if use_daily_window else "00:00:00"
         effective_daily_end = daily_end if use_daily_window else "23:59:59"
-        interval_seconds = parse_interval(sample_interval)
+        _unit_char = {"second": "s", "minute": "m", "hour": "h", "day": "d"}
+        interval_seconds = parse_interval(f"{max(1, interval_amount)}{_unit_char.get(interval_unit, 'm')}")
+        if frame_repeat < 1 or frame_repeat > 3600:
+            raise ValueError("Frame hold must be between 1 and 3600.")
         if output_fps < 1 or output_fps > 120:
             raise ValueError("Output FPS must be between 1 and 120.")
         if encoder not in {"hevc_videotoolbox", "libx265"}:
@@ -493,6 +546,7 @@ async def job_new_post(
             "x265_preset": x265_preset,
             "output_scale_mode": scale_mode,
             "output_scale_width": scale_width,
+            "frame_repeat": frame_repeat,
         }
         if data["start_at"] and data["end_at"] and data["end_at"] < data["start_at"]:
             raise ValueError("End date must be on or after the start date.")
@@ -519,6 +573,24 @@ async def job_status(job_id: int):
     if not job:
         raise HTTPException(status_code=404)
     return JSONResponse(job_status_payload(job), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/jobs/{job_id}/frames")
+async def job_frames(job_id: int):
+    if not store.get_job(job_id):
+        raise HTTPException(status_code=404)
+    rows = store.list_frames(job_id)
+    frames = [
+        {
+            "requested_at": row["requested_at"],
+            "camera_id": row["camera_id"],
+            "status": row["status"],
+            "source_method": row["source_method"] or "",
+            "error": row["error"] or "",
+        }
+        for row in rows[-200:]
+    ]
+    return JSONResponse({"frames": frames}, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/jobs/{job_id}/retry")

@@ -20,6 +20,7 @@ class VideoAssembler:
         x265_preset: str,
         output_dir: Path,
         scale_max_width: int | None = None,
+        frame_repeat: int = 1,
         metadata: dict[str, str] | None = None,
         should_cancel: Callable[[], bool] | None = None,
     ) -> tuple[Path, Path | None]:
@@ -33,7 +34,7 @@ class VideoAssembler:
         output_path = job_dir / f"timelapse_job_{job_id}.mp4"
         thumbnail_path = job_dir / f"timelapse_job_{job_id}.jpg"
         frame_list_path = job_dir / f"timelapse_job_{job_id}_frames.txt"
-        duration = 1 / fps
+        duration = max(frame_repeat, 1) / fps
 
         try:
             self._write_concat_file(frame_list_path, frame_paths, duration, should_cancel)

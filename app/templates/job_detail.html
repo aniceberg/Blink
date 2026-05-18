@@ -6,7 +6,7 @@
 <section class="page-head">
   <div>
     <h1>Job #{{ job.id }}</h1>
-    <p>{{ job.camera_names|join(", ") }} · {{ job.sample_interval_seconds }}s interval · {{ job.output_fps }}fps · {{ job.encoder }} · {{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</p>
+    <p>{{ job.camera_names|join(", ") }} · {{ format_interval(job.sample_interval_seconds) }} interval · {{ job.output_fps }}fps{% if job.frame_repeat > 1 %} · {{ job.frame_repeat }}× hold{% endif %} · {{ job.encoder }} · {{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</p>
   </div>
   <div class="actions">
     {% if job.output_path %}<button class="button primary" type="button" data-reveal-job data-reveal-url="/jobs/{{ job.id }}/reveal">Reveal in Finder</button>{% endif %}
@@ -72,25 +72,27 @@
   {% if job.error %}<pre class="error-box">{{ job.error }}</pre>{% endif %}
 </section>
 
-<section class="panel">
+<section class="panel" data-frames-url="/jobs/{{ job.id }}/frames">
   <h2>Recent frame manifest</h2>
-  {% if frames %}
-    <table>
-      <thead><tr><th>Requested</th><th>Camera</th><th>Status</th><th>Source</th><th>Error</th></tr></thead>
-      <tbody>
-        {% for frame in frames %}
-          <tr>
-            <td>{{ frame["requested_at"] }}</td>
-            <td><code>{{ frame["camera_id"] }}</code></td>
-            <td><span class="status {{ 'ok' if frame['status'] == 'success' else 'bad' }}">{{ frame["status"] }}</span></td>
-            <td>{{ frame["source_method"] or "" }}</td>
-            <td>{{ frame["error"] or "" }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="empty">No frames recorded yet.</p>
-  {% endif %}
+  <div data-frames-body>
+    {% if frames %}
+      <table>
+        <thead><tr><th>Requested</th><th>Camera</th><th>Status</th><th>Source</th><th>Error</th></tr></thead>
+        <tbody>
+          {% for frame in frames %}
+            <tr>
+              <td>{{ frame["requested_at"] }}</td>
+              <td><code>{{ frame["camera_id"] }}</code></td>
+              <td><span class="status {{ 'ok' if frame['status'] == 'success' else 'bad' }}">{{ frame["status"] }}</span></td>
+              <td>{{ frame["source_method"] or "" }}</td>
+              <td>{{ frame["error"] or "" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No frames recorded yet.</p>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}

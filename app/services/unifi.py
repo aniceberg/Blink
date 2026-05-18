@@ -20,23 +20,32 @@ class UniFiClient:
         self.settings = settings
         self.host = settings.host.rstrip("/")
         self._cookies: httpx.Cookies | None = None
+        self._is_site_manager = getattr(settings, "connection_type", "DIRECT") == "SITE_MANAGER"
+        self._host_id = getattr(settings, "host_id", None) or ""
 
     def _integration_url(self, path: str) -> str:
+        if self._is_site_manager:
+            return f"https://api.ui.com/v1/hosts/{self._host_id}/proxy/protect/integration/v1/{path.lstrip('/')}"
         return f"{self.host}/proxy/protect/integration/v1/{path.lstrip('/')}"
 
     def _protect_url(self, path: str) -> str:
+        if self._is_site_manager:
+            return f"https://api.ui.com/v1/hosts/{self._host_id}/proxy/protect/api/{path.lstrip('/')}"
         return f"{self.host}/proxy/protect/api/{path.lstrip('/')}"
 
     def _headers(self, accept: str = "application/json") -> dict[str, str]:
         headers = {"Accept": accept}
         if self.settings.api_key:
-            headers["X-API-KEY"] = self.settings.api_key
+            # Site Manager uses mixed-case X-API-Key; direct Protect uses X-API-KEY
+            key = "X-API-Key" if self._is_site_manager else "X-API-KEY"
+            headers[key] = self.settings.api_key
         return headers
 
     def _private_headers(self, accept: str = "application/json") -> dict[str, str]:
         headers = {"Accept": accept}
         if self.settings.api_key:
-            headers["X-API-KEY"] = self.settings.api_key
+            key = "X-API-Key" if self._is_site_manager else "X-API-KEY"
+            headers[key] = self.settings.api_key
         return headers
 
     async def _client(self) -> httpx.AsyncClient:
@@ -44,12 +53,18 @@ class UniFiClient:
         return httpx.AsyncClient(verify=self.settings.verify_ssl, timeout=httpx.Timeout(60.0), follow_redirects=True)
 
     async def test_login(self) -> None:
+        if self._is_site_manager:
+            # Site Manager consoles: validate by listing cameras (no credentials needed)
+            await self.list_cameras()
+            return
         if not (self.settings.username and self.settings.password):
             raise UniFiError("Username and password are required.")
         async with await self._client() as client:
             await self.login_private_api(client)
 
     async def login_private_api(self, client: httpx.AsyncClient) -> None:
+        if self._is_site_manager:
+            return  # Site Manager uses API key only — no cookie auth
         if self._cookies or not (self.settings.username and self.settings.password):
             if self._cookies:
                 client.cookies = self._cookies

@@ -43,6 +43,8 @@ class Console:
     password: str | None
     verify_ssl: bool
     enabled: bool
+    connection_type: str
+    host_id: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -81,6 +83,7 @@ class Job:
     x265_preset: str
     output_scale_mode: str
     output_scale_width: int | None
+    frame_repeat: int
     progress: float
     planned_frame_count: int
     processed_frame_count: int

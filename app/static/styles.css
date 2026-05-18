@@ -248,6 +248,17 @@ input, select {
   color: var(--text);
   font: inherit;
 }
+.input-unit-row {
+  display: flex;
+  gap: 8px;
+}
+.input-unit-row input {
+  flex: 1;
+  min-width: 0;
+}
+.input-unit-row select {
+  width: auto;
+}
 .input-action-row,
 .secret-field {
   display: grid;
