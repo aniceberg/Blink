@@ -25,12 +25,12 @@ class UniFiClient:
 
     def _integration_url(self, path: str) -> str:
         if self._is_site_manager:
-            return f"https://api.ui.com/v1/hosts/{self._host_id}/proxy/protect/integration/v1/{path.lstrip('/')}"
+            return f"https://api.ui.com/v1/connector/consoles/{self._host_id}/proxy/protect/integration/v1/{path.lstrip('/')}"
         return f"{self.host}/proxy/protect/integration/v1/{path.lstrip('/')}"
 
     def _protect_url(self, path: str) -> str:
         if self._is_site_manager:
-            return f"https://api.ui.com/v1/hosts/{self._host_id}/proxy/protect/api/{path.lstrip('/')}"
+            return f"https://api.ui.com/v1/connector/consoles/{self._host_id}/proxy/protect/api/{path.lstrip('/')}"
         return f"{self.host}/proxy/protect/api/{path.lstrip('/')}"
 
     def _headers(self, accept: str = "application/json") -> dict[str, str]:

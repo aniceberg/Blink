@@ -451,7 +451,7 @@ async def setup_console_test(console_id: int):
     # For Site Manager consoles, probe several candidate paths in parallel
     # to find which one the cloud proxy actually routes correctly.
     if connection_type == "SITE_MANAGER":
-        base = f"https://api.ui.com/v1/hosts/{stored_host_id}"
+        base = f"https://api.ui.com/v1/connector/consoles/{stored_host_id}"
         candidates = {
             "integration_v1":     f"{base}/proxy/protect/integration/v1/cameras",
             "integration_v0.1":   f"{base}/proxy/protect/integration/v0.1/cameras",
