@@ -417,10 +417,37 @@ async def setup_console_test(console_id: int):
     if not console:
         return JSONResponse({"ok": False, "error": "Console not found."}, status_code=404)
     import httpx as _httpx
+    connection_type = getattr(console, "connection_type", "DIRECT")
+    stored_host_id = getattr(console, "host_id", None) or ""
     client_obj = UniFiClient(console)
     url = client_obj._integration_url("/cameras")
     headers = client_obj._headers()
-    safe_headers = {k: (v[:8] + "…" if k.lower() in ("x-api-key", "x-api-KEY", "authorization") else v) for k, v in headers.items()}
+    safe_headers = {k: (v[:8] + "…" if k.lower() in ("x-api-key", "x-api-key", "authorization") else v) for k, v in headers.items()}
+
+    result: dict = {
+        "connection_type": connection_type,
+        "stored_host_id": stored_host_id,
+        "url": url,
+        "headers_sent": safe_headers,
+    }
+
+    # For Site Manager consoles, also fetch the raw /v1/hosts listing so we
+    # can inspect actual field names and find the correct host ID format.
+    if connection_type == "SITE_MANAGER" and console.api_key:
+        try:
+            async with _httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http:
+                hosts_resp = await http.get(
+                    "https://api.ui.com/v1/hosts",
+                    headers={"Accept": "application/json", "X-API-Key": console.api_key},
+                )
+            try:
+                hosts_body = hosts_resp.json()
+            except Exception:
+                hosts_body = hosts_resp.text[:3000]
+            result["hosts_raw"] = {"http_status": hosts_resp.status_code, "body": hosts_body}
+        except Exception as exc:
+            result["hosts_raw"] = {"error": str(exc)}
+
     try:
         async with await client_obj._client() as http:
             response = await http.get(url, headers=headers)
@@ -432,18 +459,16 @@ async def setup_console_test(console_id: int):
         except Exception:
             parsed = None
             camera_count = "parse error"
-        return JSONResponse({
+        result.update({
             "ok": response.status_code < 400,
-            "url": url,
-            "stored_host_id": getattr(console, "host_id", None),
-            "connection_type": getattr(console, "connection_type", "DIRECT"),
-            "headers_sent": safe_headers,
             "http_status": response.status_code,
             "camera_count": camera_count,
             "response_preview": body_preview,
         })
+        return JSONResponse(result)
     except Exception as exc:
-        return JSONResponse({"ok": False, "url": url, "headers_sent": safe_headers, "error": str(exc)}, status_code=502)
+        result.update({"ok": False, "error": str(exc)})
+        return JSONResponse(result, status_code=502)
 
 
 @app.post("/setup/consoles/{console_id}/delete")
