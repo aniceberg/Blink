@@ -448,6 +448,35 @@ async def setup_console_test(console_id: int):
         except Exception as exc:
             result["hosts_raw"] = {"error": str(exc)}
 
+    # For Site Manager consoles, probe several candidate paths in parallel
+    # to find which one the cloud proxy actually routes correctly.
+    if connection_type == "SITE_MANAGER":
+        base = f"https://api.ui.com/v1/hosts/{stored_host_id}"
+        candidates = {
+            "integration_v1":     f"{base}/proxy/protect/integration/v1/cameras",
+            "integration_v0.1":   f"{base}/proxy/protect/integration/v0.1/cameras",
+            "private_api":        f"{base}/proxy/protect/api/cameras",
+            "api_docs":           f"{base}/proxy/protect/api-docs/integration.json",
+        }
+        probe_results = {}
+        try:
+            async with await client_obj._client() as http:
+                for key, probe_url in candidates.items():
+                    try:
+                        r = await http.get(probe_url, headers=headers)
+                        try:
+                            body = r.json()
+                        except Exception:
+                            body = r.text[:500]
+                        probe_results[key] = {"status": r.status_code, "preview": body}
+                    except Exception as e:
+                        probe_results[key] = {"error": str(e)}
+        except Exception as exc:
+            result.update({"ok": False, "error": str(exc)})
+            return JSONResponse(result, status_code=502)
+        result.update({"ok": False, "http_status": 404, "probe_results": probe_results})
+        return JSONResponse(result)
+
     try:
         async with await client_obj._client() as http:
             response = await http.get(url, headers=headers)
