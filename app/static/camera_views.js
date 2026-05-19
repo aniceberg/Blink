@@ -469,54 +469,62 @@
     const list = document.querySelector("[data-console-list]");
     if (!list || list.dataset.dragBound === "1") return;
     list.dataset.dragBound = "1";
-    let draggingEl = null;
 
-    list.addEventListener("dragstart", (e) => {
-      const card = e.target.closest(".console-card[data-console-id]");
+    let dragging = null;
+    let placeholder = null;
+
+    function getPlaceholder() {
+      if (!placeholder) {
+        placeholder = document.createElement("div");
+        placeholder.className = "drag-placeholder";
+      }
+      return placeholder;
+    }
+
+    function cleanup() {
+      if (dragging) dragging.classList.remove("dragging");
+      getPlaceholder().remove();
+      dragging = null;
+    }
+
+    list.addEventListener("pointerdown", (e) => {
+      const handle = e.target.closest("[data-drag-handle]");
+      if (!handle) return;
+      const card = handle.closest(".console-card[data-console-id]");
       if (!card) return;
-      // Only allow drag from the handle
-      if (!e.target.closest("[data-drag-handle]")) {
-        e.preventDefault();
-        return;
-      }
-      draggingEl = card;
+      e.preventDefault();
+      dragging = card;
       card.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", card.dataset.consoleId);
+      list.setPointerCapture(e.pointerId);
     });
 
-    list.addEventListener("dragend", () => {
-      if (draggingEl) draggingEl.classList.remove("dragging");
-      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
-      draggingEl = null;
-    });
-
-    list.addEventListener("dragover", (e) => {
-      if (!draggingEl) return;
+    list.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
       e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      const card = e.target.closest(".console-card[data-console-id]");
-      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
-      if (card && card !== draggingEl) card.classList.add("drag-over");
-    });
-
-    list.addEventListener("dragleave", (e) => {
-      if (!e.relatedTarget || !list.contains(e.relatedTarget)) {
-        list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      const ph = getPlaceholder();
+      const cards = Array.from(
+        list.querySelectorAll(".console-card[data-console-id]:not(.dragging)")
+      );
+      let insertBefore = null;
+      for (const card of cards) {
+        const rect = card.getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          insertBefore = card;
+          break;
+        }
       }
-    });
-
-    list.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      const targetCard = e.target.closest(".console-card[data-console-id]");
-      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
-      if (!draggingEl || !targetCard || draggingEl === targetCard) return;
-      const rect = targetCard.getBoundingClientRect();
-      if (e.clientY < rect.top + rect.height / 2) {
-        list.insertBefore(draggingEl, targetCard);
+      if (insertBefore) {
+        list.insertBefore(ph, insertBefore);
       } else {
-        list.insertBefore(draggingEl, targetCard.nextSibling);
+        list.appendChild(ph);
       }
+    });
+
+    list.addEventListener("pointerup", async () => {
+      if (!dragging) return;
+      const ph = getPlaceholder();
+      list.insertBefore(dragging, ph);
+      cleanup();
       const ids = Array.from(list.querySelectorAll(".console-card[data-console-id]"))
         .map((c) => parseInt(c.dataset.consoleId, 10));
       try {
@@ -527,6 +535,8 @@
         });
       } catch (_) {}
     });
+
+    list.addEventListener("pointercancel", cleanup);
   }
 
   function setupAddConsoleModal() {

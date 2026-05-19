@@ -308,9 +308,12 @@ input, select {
   opacity: .45;
   box-shadow: 0 0 0 2px var(--accent);
 }
-.console-card.drag-over {
-  box-shadow: 0 0 0 2px var(--accent);
-  background: #f0f8fc;
+.drag-placeholder {
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  margin: 2px 0;
+  pointer-events: none;
 }
 .console-card-header {
   display: flex;
