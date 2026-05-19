@@ -80,12 +80,36 @@ class UniFiClient:
         self._cookies = client.cookies
 
     async def list_cameras(self) -> list[Camera]:
+        url = self._integration_url("/cameras")
         async with await self._client() as client:
-            response = await client.get(self._integration_url("/cameras"), headers=self._headers())
+            response = await client.get(url, headers=self._headers())
             if response.status_code >= 400:
-                raise UniFiError(f"Camera discovery failed with HTTP {response.status_code}: {response.text[:300]}")
+                raise UniFiError(
+                    f"Camera discovery failed: HTTP {response.status_code} from {url} — {response.text[:300]}"
+                )
             data = response.json()
-            cameras_data = data if isinstance(data, list) else data.get("data", [])
+            # Integration API v1 returns a top-level array; some proxy layers wrap it.
+            if isinstance(data, list):
+                cameras_data = data
+            elif isinstance(data, dict):
+                # Try common wrapper keys in order of likelihood
+                for key in ("data", "cameras", "items", "results"):
+                    if isinstance(data.get(key), list):
+                        cameras_data = data[key]
+                        break
+                else:
+                    raise UniFiError(
+                        f"Unexpected camera list response shape from {url}: {str(data)[:300]}"
+                    )
+            else:
+                raise UniFiError(
+                    f"Unexpected camera list response type from {url}: {type(data).__name__}"
+                )
+            if not cameras_data:
+                raise UniFiError(
+                    f"Camera list from {url} returned no cameras (HTTP {response.status_code}). "
+                    f"Response: {response.text[:300]}"
+                )
             return [self._camera_from_payload(item) for item in cameras_data]
 
     async def download_live_snapshot(self, camera_id: str) -> tuple[bytes, str]:

@@ -317,7 +317,7 @@ async def _validate_console_credentials(
 async def setup_site_manager_hosts(api_key: str = Query(...)):
     try:
         hosts = await sm_list_hosts(api_key)
-        protect_hosts = [h for h in hosts if "protect" in h.get("applications", [])]
+        protect_hosts = [h for h in hosts if any("protect" in app for app in h.get("applications", []))]
         return JSONResponse({"ok": True, "hosts": protect_hosts})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)
