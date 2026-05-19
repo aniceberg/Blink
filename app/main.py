@@ -391,6 +391,40 @@ async def setup_console_update(
     return RedirectResponse("/setup", status_code=303)
 
 
+@app.get("/setup/consoles/{console_id}/test")
+async def setup_console_test(console_id: int):
+    """Return a diagnostic JSON payload showing the raw camera-list API call and response."""
+    console = store.get_console(console_id)
+    if not console:
+        return JSONResponse({"ok": False, "error": "Console not found."}, status_code=404)
+    import httpx as _httpx
+    client_obj = UniFiClient(console)
+    url = client_obj._integration_url("/cameras")
+    headers = client_obj._headers()
+    safe_headers = {k: (v[:8] + "…" if k.lower() in ("x-api-key", "x-api-KEY", "authorization") else v) for k, v in headers.items()}
+    try:
+        async with await client_obj._client() as http:
+            response = await http.get(url, headers=headers)
+        body_preview = response.text[:2000]
+        try:
+            parsed = response.json()
+            camera_count = len(parsed) if isinstance(parsed, list) else (
+                len(parsed.get("data", parsed.get("cameras", parsed.get("items", [])))) if isinstance(parsed, dict) else "?")
+        except Exception:
+            parsed = None
+            camera_count = "parse error"
+        return JSONResponse({
+            "ok": response.status_code < 400,
+            "url": url,
+            "headers_sent": safe_headers,
+            "http_status": response.status_code,
+            "camera_count": camera_count,
+            "response_preview": body_preview,
+        })
+    except Exception as exc:
+        return JSONResponse({"ok": False, "url": url, "headers_sent": safe_headers, "error": str(exc)}, status_code=502)
+
+
 @app.post("/setup/consoles/{console_id}/delete")
 async def setup_console_delete(console_id: int):
     if not store.get_console(console_id):

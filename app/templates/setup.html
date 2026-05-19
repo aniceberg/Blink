@@ -112,8 +112,10 @@
           <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
           <div class="actions">
             <button class="button primary" type="submit">Save console</button>
+            <button class="button" type="button" data-test-console="/setup/consoles/{{ console.id }}/test">Test connection</button>
             <button class="button danger" type="submit" form="delete-console-{{ console.id }}">Delete</button>
           </div>
+          <pre class="error-box" data-test-result-{{ console.id }} style="display:none;margin-top:10px;font-size:12px"></pre>
         </form>
         <form id="delete-console-{{ console.id }}" method="post" action="/setup/consoles/{{ console.id }}/delete" onsubmit="return confirm('Delete {{ console.name }} and its cached cameras? Existing jobs and videos are kept.');"></form>
       {% endfor %}

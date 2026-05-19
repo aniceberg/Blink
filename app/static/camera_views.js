@@ -385,6 +385,12 @@
       button.dataset.siteManagerBound = "1";
       button.addEventListener("click", discoverSiteManagerHosts);
     });
+
+    document.querySelectorAll("[data-test-console]").forEach((button) => {
+      if (button.dataset.testConsoleBound === "1") return;
+      button.dataset.testConsoleBound = "1";
+      button.addEventListener("click", testConsoleConnection);
+    });
   }
 
   async function discoverSiteManagerHosts(event) {
@@ -438,6 +444,32 @@
       });
     } catch (error) {
       resultContainer.innerHTML = `<div class="notice error">${error.message || "Could not reach the Site Manager API."}</div>`;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function testConsoleConnection(event) {
+    const button = event.currentTarget;
+    const testUrl = button.dataset.testConsole;
+    if (!testUrl) return;
+
+    // Extract console id from URL: /setup/consoles/{id}/test
+    const consoleId = testUrl.split("/").slice(-2, -1)[0];
+    const resultEl = document.querySelector(`[data-test-result-${consoleId}]`);
+
+    button.disabled = true;
+    if (resultEl) {
+      resultEl.style.display = "block";
+      resultEl.textContent = "Testing…";
+    }
+
+    try {
+      const response = await fetch(testUrl, { headers: { Accept: "application/json" } });
+      const data = await response.json();
+      if (resultEl) resultEl.textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+      if (resultEl) resultEl.textContent = "Request failed: " + err.message;
     } finally {
       button.disabled = false;
     }
