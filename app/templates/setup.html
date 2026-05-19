@@ -41,10 +41,34 @@
     <div class="console-list">
       {% for console in consoles %}
         <form class="console-card form" method="post" action="/setup/consoles/{{ console.id }}">
+          <input type="hidden" name="connection_type" value="{{ console.connection_type }}">
+          <input type="hidden" name="host_id" value="{{ console.host_id or '' }}">
           <div class="fieldset-head">
-            <strong>{{ console.name }}</strong>
+            <strong>{{ console.name }}{% if console.connection_type == "SITE_MANAGER" %} <span class="status">Site Manager</span>{% endif %}</strong>
             <label class="check"><input type="checkbox" name="enabled" {% if console.enabled %}checked{% endif %}> Enabled</label>
           </div>
+          {% if console.connection_type == "SITE_MANAGER" %}
+          <div class="two">
+            <label>Display name
+              <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
+            </label>
+            <label>UI API key
+              <div class="secret-field">
+                <input name="api_key" value="{{ console.api_key }}" placeholder="UI API key from ui.com" type="password" data-secret-input>
+                <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </label>
+          </div>
+          <input type="hidden" name="host" value="">
+          <input type="hidden" name="username" value="">
+          <input type="hidden" name="password" value="">
+          <p class="field-help">Cloud console · Host ID: <code>{{ console.host_id }}</code></p>
+          {% else %}
           <div class="two">
             <label>Display name
               <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
@@ -84,6 +108,7 @@
               </div>
             </label>
           </div>
+          {% endif %}
           <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
           <div class="actions">
             <button class="button primary" type="submit">Save console</button>
