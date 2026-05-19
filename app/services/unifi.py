@@ -158,6 +158,17 @@ class UniFiClient:
 
     def _camera_from_payload(self, item: dict[str, Any]) -> Camera:
         feature_flags = item.get("featureFlags") or {}
+        # Integration API v1 uses connectionState; private API uses state.
+        # Accept either so the same parser handles both surfaces.
+        connection_state = item.get("connectionState") or item.get("state") or ""
+        is_connected = (
+            connection_state.upper() == "CONNECTED"
+            or bool(item.get("isConnected"))
+        )
+        # isRecording may be a flat bool (private API) or nested under recordingSettings.
+        is_recording = bool(item.get("isRecording")) or bool(
+            (item.get("recordingSettings") or {}).get("mode") not in (None, "never", "disabled")
+        )
         return Camera(
             camera_id=item.get("id", ""),
             console_id=0,
@@ -165,9 +176,9 @@ class UniFiClient:
             protect_camera_id=item.get("id", ""),
             name=item.get("name") or item.get("id", "Camera"),
             model=item.get("modelKey") or item.get("type"),
-            state=item.get("state"),
-            is_connected=item.get("state") == "CONNECTED" or bool(item.get("isConnected")),
-            is_recording=bool(item.get("isRecording")),
+            state=connection_state or None,
+            is_connected=is_connected,
+            is_recording=is_recording,
             raw={**item, "featureFlags": feature_flags},
         )
 

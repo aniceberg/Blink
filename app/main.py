@@ -420,7 +420,8 @@ async def cameras_refresh(request: Request):
     errors: list[str] = []
     refreshed = 0
     for console in consoles:
-        if not console.host:
+        is_site_manager = getattr(console, "connection_type", "DIRECT") == "SITE_MANAGER"
+        if not console.host and not is_site_manager:
             errors.append(f"{console.name}: missing host")
             continue
         try:
