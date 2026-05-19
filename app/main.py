@@ -323,6 +323,25 @@ async def setup_site_manager_hosts(api_key: str = Query(...)):
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)
 
 
+@app.get("/setup/site-manager/hosts-raw")
+async def setup_site_manager_hosts_raw(api_key: str = Query(...)):
+    """Return the raw /v1/hosts response from api.ui.com for debugging."""
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(
+                "https://api.ui.com/v1/hosts",
+                headers={"Accept": "application/json", "X-API-Key": api_key},
+            )
+        try:
+            body = response.json()
+        except Exception:
+            body = response.text[:3000]
+        return JSONResponse({"http_status": response.status_code, "body": body})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)
+
+
 @app.post("/setup/consoles")
 async def setup_console_create(
     request: Request,
@@ -416,6 +435,8 @@ async def setup_console_test(console_id: int):
         return JSONResponse({
             "ok": response.status_code < 400,
             "url": url,
+            "stored_host_id": getattr(console, "host_id", None),
+            "connection_type": getattr(console, "connection_type", "DIRECT"),
             "headers_sent": safe_headers,
             "http_status": response.status_code,
             "camera_count": camera_count,
