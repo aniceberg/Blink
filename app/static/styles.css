@@ -305,8 +305,20 @@ input, select {
   transition: box-shadow .12s, opacity .12s;
 }
 .console-card.dragging {
-  opacity: .45;
-  box-shadow: 0 0 0 2px var(--accent);
+  opacity: .25;
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 500;
+  pointer-events: none;
+  opacity: .95;
+  box-shadow: 0 12px 36px rgba(20, 30, 40, .22);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transform: rotate(0.6deg) scale(1.01);
+  cursor: grabbing;
+  overflow: hidden;
 }
 .drag-placeholder {
   height: 3px;

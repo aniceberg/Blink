@@ -470,20 +470,23 @@
     if (!list || list.dataset.dragBound === "1") return;
     list.dataset.dragBound = "1";
 
-    let dragging = null;
-    let placeholder = null;
+    let dragging = null;   // original card (dimmed in place)
+    let ghost = null;      // floating clone that follows the cursor
+    let line = null;       // blue insertion line
+    let offsetY = 0;       // pointer offset within the card
 
-    function getPlaceholder() {
-      if (!placeholder) {
-        placeholder = document.createElement("div");
-        placeholder.className = "drag-placeholder";
+    function getLine() {
+      if (!line) {
+        line = document.createElement("div");
+        line.className = "drag-placeholder";
       }
-      return placeholder;
+      return line;
     }
 
     function cleanup() {
+      if (ghost) { ghost.remove(); ghost = null; }
+      getLine().remove();
       if (dragging) dragging.classList.remove("dragging");
-      getPlaceholder().remove();
       dragging = null;
     }
 
@@ -493,38 +496,51 @@
       const card = handle.closest(".console-card[data-console-id]");
       if (!card) return;
       e.preventDefault();
+
+      const rect = card.getBoundingClientRect();
+      offsetY = e.clientY - rect.top;
+
       dragging = card;
       card.classList.add("dragging");
+
+      // Floating ghost that tracks the cursor
+      ghost = card.cloneNode(true);
+      ghost.classList.add("drag-ghost");
+      ghost.style.width = `${rect.width}px`;
+      ghost.style.top = `${rect.top}px`;
+      ghost.style.left = `${rect.left}px`;
+      document.body.appendChild(ghost);
+
       list.setPointerCapture(e.pointerId);
     });
 
     list.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+      if (!dragging || !ghost) return;
       e.preventDefault();
-      const ph = getPlaceholder();
+
+      // Ghost follows cursor
+      ghost.style.top = `${e.clientY - offsetY}px`;
+
+      // Blue insertion line tracks target position
+      const ln = getLine();
       const cards = Array.from(
         list.querySelectorAll(".console-card[data-console-id]:not(.dragging)")
       );
       let insertBefore = null;
       for (const card of cards) {
-        const rect = card.getBoundingClientRect();
-        if (e.clientY < rect.top + rect.height / 2) {
-          insertBefore = card;
-          break;
-        }
+        const r = card.getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) { insertBefore = card; break; }
       }
-      if (insertBefore) {
-        list.insertBefore(ph, insertBefore);
-      } else {
-        list.appendChild(ph);
-      }
+      insertBefore ? list.insertBefore(ln, insertBefore) : list.appendChild(ln);
     });
 
     list.addEventListener("pointerup", async () => {
       if (!dragging) return;
-      const ph = getPlaceholder();
-      list.insertBefore(dragging, ph);
+      const ln = getLine();
+      // Only reorder if the insertion line was actually placed
+      if (ln.parentNode === list) list.insertBefore(dragging, ln);
       cleanup();
+
       const ids = Array.from(list.querySelectorAll(".console-card[data-console-id]"))
         .map((c) => parseInt(c.dataset.consoleId, 10));
       try {
