@@ -164,6 +164,7 @@ class Store:
             self._ensure_column(conn, "jobs", "frame_repeat", "INTEGER NOT NULL DEFAULT 1")
             self._ensure_column(conn, "consoles", "connection_type", "TEXT NOT NULL DEFAULT 'DIRECT'")
             self._ensure_column(conn, "consoles", "host_id", "TEXT")
+            self._ensure_column(conn, "consoles", "sort_order", "INTEGER NOT NULL DEFAULT 0")
             row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
             if row is None:
                 conn.execute("INSERT INTO settings (id, updated_at) VALUES (1, ?)", (utc_now(),))
@@ -271,10 +272,15 @@ class Store:
         params: tuple[Any, ...] = ()
         if enabled_only:
             sql += " WHERE enabled = 1"
-        sql += " ORDER BY name, id"
+        sql += " ORDER BY sort_order, id"
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_console(row) for row in rows]
+
+    def reorder_consoles(self, ids: list[int]) -> None:
+        with self.connect() as conn:
+            for position, console_id in enumerate(ids):
+                conn.execute("UPDATE consoles SET sort_order = ? WHERE id = ?", (position, console_id))
 
     def get_console(self, console_id: int) -> Console | None:
         with self.connect() as conn:
@@ -289,8 +295,8 @@ class Store:
         with self.connect() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO consoles (name, host, api_key, username, password, verify_ssl, enabled, connection_type, host_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO consoles (name, host, api_key, username, password, verify_ssl, enabled, connection_type, host_id, sort_order, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM consoles), ?, ?)
                 """,
                 (
                     name,

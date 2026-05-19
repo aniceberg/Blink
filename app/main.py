@@ -374,6 +374,48 @@ async def setup_console_create(
     return RedirectResponse("/setup", status_code=303)
 
 
+@app.post("/setup/consoles/reorder")
+async def reorder_consoles(request: Request):
+    """Accept a JSON body {ids: [1, 2, 3]} and persist the new sort order."""
+    data = await request.json()
+    ids = [int(i) for i in data.get("ids", [])]
+    if ids:
+        store.reorder_consoles(ids)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/setup/consoles/test-credentials")
+async def test_console_credentials(
+    host: str = Form(""),
+    api_key: str = Form(""),
+    username: str = Form(""),
+    password: str = Form(""),
+    verify_ssl: str | None = Form(None),
+    connection_type: str = Form("DIRECT"),
+    host_id: str = Form(""),
+):
+    """Test console credentials without saving — used by the Add console modal."""
+    from types import SimpleNamespace
+    try:
+        if connection_type == "SITE_MANAGER":
+            settings = SimpleNamespace(
+                host="https://api.ui.com", api_key=api_key, username=None, password=None,
+                verify_ssl=False, connection_type="SITE_MANAGER", host_id=host_id,
+            )
+            cameras = await UniFiClient(settings).list_cameras()
+            return JSONResponse({"ok": True, "message": f"Connected — {len(cameras)} cameras found."})
+        else:
+            settings = SimpleNamespace(
+                host=host, api_key=api_key or None, username=username or None,
+                password=password or None, verify_ssl=bool(verify_ssl),
+                connection_type="DIRECT", host_id=None,
+            )
+            await UniFiClient(settings).test_login()
+            return JSONResponse({"ok": True, "message": "Login successful."})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)})
+
+
 @app.post("/setup/consoles/{console_id}")
 async def setup_console_update(
     request: Request,
@@ -506,6 +548,28 @@ async def setup_console_delete(console_id: int):
         raise HTTPException(status_code=404)
     store.delete_console(console_id)
     return RedirectResponse("/setup", status_code=303)
+
+
+@app.post("/setup/consoles/{console_id}/enabled")
+async def toggle_console_enabled(console_id: int, request: Request):
+    """Instantly toggle enabled/disabled for a console without a full page reload."""
+    console = store.get_console(console_id)
+    if not console:
+        raise HTTPException(status_code=404)
+    data = await request.json()
+    enabled = bool(data.get("enabled", True))
+    store.update_console(console_id, {
+        "name": console.name,
+        "host": console.host,
+        "api_key": console.api_key,
+        "username": console.username,
+        "password": console.password,
+        "verify_ssl": console.verify_ssl,
+        "enabled": enabled,
+        "connection_type": getattr(console, "connection_type", "DIRECT"),
+        "host_id": getattr(console, "host_id", None),
+    })
+    return JSONResponse({"ok": True})
 
 
 @app.get("/setup/detect-host")

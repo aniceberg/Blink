@@ -36,163 +36,140 @@
 <section class="panel">
   <div class="section-title">
     <h2>UniFi consoles</h2>
+    <button class="button primary" type="button" data-open-add-console>+ Add console</button>
   </div>
   {% if consoles %}
-    <div class="console-list">
+    <div class="console-list" data-console-list>
       {% for console in consoles %}
-        <form class="console-card form" method="post" action="/setup/consoles/{{ console.id }}">
-          <input type="hidden" name="connection_type" value="{{ console.connection_type }}">
-          <input type="hidden" name="host_id" value="{{ console.host_id or '' }}">
-          <div class="fieldset-head">
-            <strong>{{ console.name }}{% if console.connection_type == "SITE_MANAGER" %} <span class="status">Site Manager</span>{% endif %}</strong>
-            <label class="check"><input type="checkbox" name="enabled" {% if console.enabled %}checked{% endif %}> Enabled</label>
-          </div>
-          {% if console.connection_type == "SITE_MANAGER" %}
-          <div class="two">
-            <label>Display name
-              <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
-            </label>
-            <label>UI API key
-              <div class="secret-field">
-                <input name="api_key" value="{{ console.api_key }}" placeholder="UI API key from ui.com" type="password" data-secret-input>
-                <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                </button>
-              </div>
-            </label>
-          </div>
-          <input type="hidden" name="host" value="">
-          <input type="hidden" name="username" value="">
-          <input type="hidden" name="password" value="">
-          <p class="field-help">Cloud console · Host ID: <code>{{ console.host_id }}</code></p>
-          {% else %}
-          <div class="two">
-            <label>Display name
-              <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
-            </label>
-            <label>UniFi host
-              <div class="input-action-row">
-                <input name="host" value="{{ console.host }}" placeholder="https://192.168.1.1" required data-unifi-host>
-                <button class="button" type="button" data-detect-host>Detect</button>
-              </div>
-              <span class="field-help" data-detect-host-status></span>
-            </label>
-          </div>
-          <label>Integration API key
-            <div class="secret-field">
-              <input name="api_key" value="{{ console.api_key }}" placeholder="Protect API key" type="password" data-secret-input>
-              <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-              </button>
+        <div class="console-card" data-console-id="{{ console.id }}" draggable="true">
+          <div class="console-card-header" data-console-header="{{ console.id }}">
+            <span class="drag-handle" aria-label="Drag to reorder" data-drag-handle>
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="4" r="1.4"/><circle cx="11" cy="4" r="1.4"/>
+                <circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/>
+                <circle cx="5" cy="12" r="1.4"/><circle cx="11" cy="12" r="1.4"/>
+              </svg>
+            </span>
+            <div class="console-card-title">
+              <span class="console-card-name" data-console-name="{{ console.id }}">{{ console.name }}</span>
+              {% if console.connection_type == "SITE_MANAGER" %}
+              <span class="status">Cloud</span>
+              {% endif %}
             </div>
-          </label>
-          <div class="two">
-            <label>Username
-              <input name="username" value="{{ console.username }}" placeholder="admin" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <label class="check console-enabled-label" onclick="event.stopPropagation()">
+              <input type="checkbox" {% if console.enabled %}checked{% endif %}
+                     data-toggle-enabled="{{ console.id }}"> Enabled
             </label>
-            <label>Password
-              <div class="secret-field">
-                <input name="password" value="{{ console.password }}" placeholder="Password" type="password" required data-secret-input>
-                <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                </button>
+            <button class="icon-button console-collapse-btn" type="button"
+                    data-collapse-console="{{ console.id }}"
+                    aria-expanded="false"
+                    aria-controls="console-body-{{ console.id }}"
+                    onclick="event.stopPropagation()">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="console-card-body" id="console-body-{{ console.id }}" hidden>
+            <form class="form" method="post" action="/setup/consoles/{{ console.id }}" id="console-form-{{ console.id }}">
+              <input type="hidden" name="connection_type" value="{{ console.connection_type }}">
+              <input type="hidden" name="host_id" value="{{ console.host_id or '' }}">
+
+              {% if console.connection_type == "SITE_MANAGER" %}
+              <div class="two">
+                <label>Display name
+                  <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
+                </label>
+                <label>UI API key
+                  <div class="secret-field">
+                    <input name="api_key" value="{{ console.api_key }}" placeholder="UI API key from ui.com" type="password" data-secret-input>
+                    <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                </label>
               </div>
-            </label>
+              <input type="hidden" name="host" value="">
+              <input type="hidden" name="username" value="">
+              <input type="hidden" name="password" value="">
+              <p class="field-help">Cloud console · Host ID: <code>{{ console.host_id }}</code></p>
+              {% else %}
+              <div class="two">
+                <label>Display name
+                  <input name="name" value="{{ console.name }}" placeholder="Front Gate Console">
+                </label>
+                <label>UniFi host
+                  <div class="input-action-row">
+                    <input name="host" value="{{ console.host }}" placeholder="https://192.168.1.1" required data-unifi-host>
+                    <button class="button" type="button" data-detect-host>Detect</button>
+                  </div>
+                  <span class="field-help" data-detect-host-status></span>
+                </label>
+              </div>
+              <label>Integration API key
+                <div class="secret-field">
+                  <input name="api_key" value="{{ console.api_key }}" placeholder="Protect API key" type="password" data-secret-input>
+                  <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
+                </div>
+              </label>
+              <div class="two">
+                <label>Username
+                  <input name="username" value="{{ console.username }}" placeholder="admin" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                </label>
+                <label>Password
+                  <div class="secret-field">
+                    <input name="password" value="{{ console.password }}" placeholder="Password" type="password" required data-secret-input>
+                    <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                </label>
+              </div>
+              {% endif %}
+
+              <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
+              <label class="check"><input type="checkbox" name="enabled" {% if console.enabled %}checked{% endif %}> Enabled</label>
+
+              <div class="actions">
+                <button class="button primary" type="submit">Save console</button>
+                <button class="button" type="button"
+                        data-test-console="/setup/consoles/{{ console.id }}/test"
+                        data-test-target="{{ console.id }}">Test connection</button>
+                <button class="button danger" type="submit" form="delete-console-{{ console.id }}">Delete</button>
+              </div>
+            </form>
+
+            <div class="test-result-wrapper" id="test-wrapper-{{ console.id }}" hidden>
+              <div class="test-result-bar">
+                <span class="muted" style="font-size:13px;font-weight:600">Test result</span>
+                <button class="button" type="button" data-copy-test="{{ console.id }}"
+                        style="padding:0 10px;min-height:28px;font-size:12px">Copy text</button>
+              </div>
+              <pre class="error-box test-result-pre" data-test-result-{{ console.id }}></pre>
+            </div>
+
+            <form id="delete-console-{{ console.id }}" method="post" action="/setup/consoles/{{ console.id }}/delete"
+                  onsubmit="return confirm('Delete {{ console.name }} and its cached cameras? Existing jobs and videos are kept.');"></form>
           </div>
-          {% endif %}
-          <label class="check"><input type="checkbox" name="verify_ssl" {% if console.verify_ssl %}checked{% endif %}> Verify SSL certificates</label>
-          <div class="actions">
-            <button class="button primary" type="submit">Save console</button>
-            <button class="button" type="button" data-test-console="/setup/consoles/{{ console.id }}/test">Test connection</button>
-            <button class="button danger" type="submit" form="delete-console-{{ console.id }}">Delete</button>
-          </div>
-          <pre class="error-box" data-test-result-{{ console.id }} style="display:none;margin-top:10px;font-size:12px"></pre>
-        </form>
-        <form id="delete-console-{{ console.id }}" method="post" action="/setup/consoles/{{ console.id }}/delete" onsubmit="return confirm('Delete {{ console.name }} and its cached cameras? Existing jobs and videos are kept.');"></form>
+        </div>
       {% endfor %}
     </div>
   {% else %}
-    <p class="empty">No consoles saved yet.</p>
+    <p class="empty">No consoles saved yet. Click <strong>+ Add console</strong> to get started.</p>
   {% endif %}
 </section>
-
-<form class="panel form" method="post" action="/setup/consoles">
-  <h2>Add console</h2>
-  <div class="two">
-    <label>Display name
-      <input name="name" placeholder="Optional">
-    </label>
-    <label>UniFi host
-      <div class="input-action-row">
-        <input name="host" placeholder="https://192.168.1.1" required data-unifi-host>
-        <button class="button" type="button" data-detect-host>Detect</button>
-      </div>
-      <span class="field-help" data-detect-host-status></span>
-    </label>
-  </div>
-  <label>Integration API key
-    <div class="secret-field">
-      <input name="api_key" placeholder="Protect API key" type="password" data-secret-input>
-      <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-          <circle cx="12" cy="12" r="3"></circle>
-        </svg>
-      </button>
-    </div>
-  </label>
-  <div class="two">
-    <label>Username
-      <input name="username" placeholder="admin" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    </label>
-    <label>Password
-      <div class="secret-field">
-        <input name="password" placeholder="Password" type="password" required data-secret-input>
-        <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-        </button>
-      </div>
-    </label>
-  </div>
-  <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
-  <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
-  <button class="button primary" type="submit">Add console</button>
-</form>
-
-<form class="panel form" method="post" action="/setup/consoles">
-  <h2>Add console via Site Manager (cloud)</h2>
-  <p>Connect a console that's only reachable through Ubiquiti's cloud. Get your UI API key from <strong>ui.com → Account → API Keys</strong>.</p>
-  <input type="hidden" name="connection_type" value="SITE_MANAGER">
-  <input type="hidden" name="host_id" value="" data-sm-host-id-field>
-  <input type="hidden" name="host" value="">
-  <div class="two">
-    <label>Display name
-      <input name="name" placeholder="Optional" data-sm-name-field>
-    </label>
-    <label>UI API key
-      <div class="input-action-row">
-        <input name="api_key" placeholder="UI API key from ui.com" autocomplete="off" spellcheck="false" data-site-manager-api-key>
-        <button class="button" type="button" data-discover-site-manager>Discover</button>
-      </div>
-    </label>
-  </div>
-  <div data-site-manager-results></div>
-  <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
-  <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
-  <button class="button primary" type="submit">Add console</button>
-</form>
 
 <section class="panel">
   <h2>Encoder status</h2>
@@ -207,4 +184,115 @@
     </tbody>
   </table>
 </section>
+
+<!-- Add Console Modal -->
+<div class="modal-backdrop" id="add-console-modal" hidden data-add-console-modal>
+  <div class="add-console-modal">
+    <div class="add-console-modal-head">
+      <h2 style="margin:0;font-size:18px">Add console</h2>
+      <button class="icon-button" type="button" data-close-add-console aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="segmented" style="align-self:flex-start">
+      <button class="segmented-button active" type="button" data-add-console-tab="direct">Direct</button>
+      <button class="segmented-button" type="button" data-add-console-tab="cloud">Cloud (Site Manager)</button>
+    </div>
+
+    <form id="add-console-form" class="form" method="post" action="/setup/consoles">
+      <input type="hidden" name="connection_type" value="DIRECT" id="add-console-type-field">
+      <input type="hidden" name="host_id" value="" id="add-console-host-id-field" data-sm-host-id-field>
+
+      <!-- Direct connection fields -->
+      <div data-add-console-section="direct">
+        <div class="form" style="gap:14px">
+          <div class="two">
+            <label>Display name
+              <input name="name" id="add-direct-name" placeholder="Optional">
+            </label>
+            <label>UniFi host
+              <div class="input-action-row">
+                <input name="host" id="add-direct-host" placeholder="https://192.168.1.1" data-unifi-host>
+                <button class="button" type="button" data-detect-host>Detect</button>
+              </div>
+              <span class="field-help" data-detect-host-status></span>
+            </label>
+          </div>
+          <label>Integration API key
+            <div class="secret-field">
+              <input name="api_key" id="add-direct-apikey" placeholder="Protect API key" type="password" data-secret-input>
+              <button class="icon-button" type="button" title="Show API key" aria-label="Show API key" data-toggle-secret>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </label>
+          <div class="two">
+            <label>Username
+              <input name="username" id="add-direct-username" placeholder="admin" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </label>
+            <label>Password
+              <div class="secret-field">
+                <input name="password" id="add-direct-password" placeholder="Password" type="password" data-secret-input>
+                <button class="icon-button" type="button" title="Show password" aria-label="Show password" data-toggle-secret>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cloud / Site Manager fields -->
+      <div data-add-console-section="cloud" hidden>
+        <div class="form" style="gap:14px">
+          <p style="margin:0">Connect a console reachable through Ubiquiti's cloud. Get your UI API key from <strong>ui.com → Account → API Keys</strong>.</p>
+          <div class="two">
+            <label>Display name
+              <input name="name" id="add-cloud-name" placeholder="Optional" data-sm-name-field>
+            </label>
+            <label>UI API key
+              <div class="input-action-row">
+                <input name="api_key" id="add-cloud-apikey" placeholder="UI API key from ui.com" autocomplete="off" spellcheck="false" data-site-manager-api-key>
+                <button class="button" type="button" data-discover-site-manager>Discover</button>
+              </div>
+            </label>
+          </div>
+          <div data-site-manager-results></div>
+        </div>
+        <!-- Placeholders so server receives empty strings for Direct-only fields -->
+        <input type="hidden" name="host" value="" id="add-cloud-host-placeholder">
+        <input type="hidden" name="username" value="" id="add-cloud-username-placeholder">
+        <input type="hidden" name="password" value="" id="add-cloud-password-placeholder">
+      </div>
+
+      <div class="two" style="margin-top:4px">
+        <label class="check"><input type="checkbox" name="enabled" checked> Enabled</label>
+        <label class="check"><input type="checkbox" name="verify_ssl"> Verify SSL certificates</label>
+      </div>
+
+      <!-- Test result area (shown after clicking Test connection) -->
+      <div id="add-console-test-area" hidden>
+        <div class="test-result-bar">
+          <span class="muted" style="font-size:13px;font-weight:600">Test result</span>
+          <button class="button" type="button" data-copy-add-console-test
+                  style="padding:0 10px;min-height:28px;font-size:12px">Copy text</button>
+        </div>
+        <pre class="error-box test-result-pre" id="add-console-test-output"></pre>
+      </div>
+
+      <div class="actions" style="justify-content:flex-end">
+        <button class="button primary" type="submit">Add console</button>
+        <button class="button" type="button" data-test-add-console>Test connection</button>
+        <button class="button" type="button" data-close-add-console>Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}

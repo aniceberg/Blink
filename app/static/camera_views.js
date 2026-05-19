@@ -391,6 +391,246 @@
       button.dataset.testConsoleBound = "1";
       button.addEventListener("click", testConsoleConnection);
     });
+
+    // Console card collapse toggles (click on header)
+    document.querySelectorAll("[data-console-header]").forEach((header) => {
+      if (header.dataset.consoleHeaderBound === "1") return;
+      header.dataset.consoleHeaderBound = "1";
+      header.addEventListener("click", () => toggleConsoleCard(header.dataset.consoleHeader));
+    });
+    document.querySelectorAll("[data-collapse-console]").forEach((btn) => {
+      if (btn.dataset.collapseConsoleBound === "1") return;
+      btn.dataset.collapseConsoleBound = "1";
+      btn.addEventListener("click", () => toggleConsoleCard(btn.dataset.collapseConsole));
+    });
+    initConsoleCardStates();
+
+    // Enabled/disabled instant toggle
+    document.querySelectorAll("[data-toggle-enabled]").forEach((checkbox) => {
+      if (checkbox.dataset.toggleEnabledBound === "1") return;
+      checkbox.dataset.toggleEnabledBound = "1";
+      checkbox.addEventListener("change", async () => {
+        const consoleId = checkbox.dataset.toggleEnabled;
+        try {
+          await fetch(`/setup/consoles/${consoleId}/enabled`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: checkbox.checked }),
+          });
+        } catch (_) {
+          checkbox.checked = !checkbox.checked; // revert on network error
+        }
+      });
+    });
+
+    // Copy test result buttons on existing console cards
+    document.querySelectorAll("[data-copy-test]").forEach((btn) => {
+      if (btn.dataset.copyTestBound === "1") return;
+      btn.dataset.copyTestBound = "1";
+      btn.addEventListener("click", () => {
+        const consoleId = btn.dataset.copyTest;
+        const resultEl = document.querySelector(`[data-test-result-${consoleId}]`);
+        if (resultEl) navigator.clipboard.writeText(resultEl.textContent).catch(() => {});
+      });
+    });
+
+    setupConsoleDragReorder();
+    setupAddConsoleModal();
+  }
+
+  function toggleConsoleCard(consoleId) {
+    const body = document.getElementById(`console-body-${consoleId}`);
+    const btn = document.querySelector(`[data-collapse-console="${consoleId}"]`);
+    if (!body || !btn) return;
+    const willExpand = body.hidden;
+    body.hidden = !willExpand;
+    btn.setAttribute("aria-expanded", willExpand ? "true" : "false");
+    const key = `blink.console.expanded.${consoleId}`;
+    if (willExpand) {
+      localStorage.setItem(key, "1");
+    } else {
+      localStorage.removeItem(key);
+    }
+  }
+
+  function initConsoleCardStates() {
+    document.querySelectorAll(".console-card[data-console-id]").forEach((card) => {
+      const consoleId = card.dataset.consoleId;
+      const body = document.getElementById(`console-body-${consoleId}`);
+      const btn = document.querySelector(`[data-collapse-console="${consoleId}"]`);
+      if (!body || !btn) return;
+      const isExpanded = localStorage.getItem(`blink.console.expanded.${consoleId}`) === "1";
+      body.hidden = !isExpanded;
+      btn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    });
+  }
+
+  function setupConsoleDragReorder() {
+    const list = document.querySelector("[data-console-list]");
+    if (!list || list.dataset.dragBound === "1") return;
+    list.dataset.dragBound = "1";
+    let draggingEl = null;
+
+    list.addEventListener("dragstart", (e) => {
+      const card = e.target.closest(".console-card[data-console-id]");
+      if (!card) return;
+      // Only allow drag from the handle
+      if (!e.target.closest("[data-drag-handle]")) {
+        e.preventDefault();
+        return;
+      }
+      draggingEl = card;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.dataset.consoleId);
+    });
+
+    list.addEventListener("dragend", () => {
+      if (draggingEl) draggingEl.classList.remove("dragging");
+      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      draggingEl = null;
+    });
+
+    list.addEventListener("dragover", (e) => {
+      if (!draggingEl) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const card = e.target.closest(".console-card[data-console-id]");
+      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      if (card && card !== draggingEl) card.classList.add("drag-over");
+    });
+
+    list.addEventListener("dragleave", (e) => {
+      if (!e.relatedTarget || !list.contains(e.relatedTarget)) {
+        list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      }
+    });
+
+    list.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      const targetCard = e.target.closest(".console-card[data-console-id]");
+      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      if (!draggingEl || !targetCard || draggingEl === targetCard) return;
+      const rect = targetCard.getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        list.insertBefore(draggingEl, targetCard);
+      } else {
+        list.insertBefore(draggingEl, targetCard.nextSibling);
+      }
+      const ids = Array.from(list.querySelectorAll(".console-card[data-console-id]"))
+        .map((c) => parseInt(c.dataset.consoleId, 10));
+      try {
+        await fetch("/setup/consoles/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+      } catch (_) {}
+    });
+  }
+
+  function setupAddConsoleModal() {
+    const modal = document.getElementById("add-console-modal");
+    if (!modal || modal.dataset.modalBound === "1") return;
+    modal.dataset.modalBound = "1";
+
+    // Open
+    document.querySelectorAll("[data-open-add-console]").forEach((btn) => {
+      btn.addEventListener("click", () => openAddConsoleModal());
+    });
+    // Close
+    modal.querySelectorAll("[data-close-add-console]").forEach((btn) => {
+      btn.addEventListener("click", () => closeAddConsoleModal());
+    });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeAddConsoleModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.hidden) closeAddConsoleModal();
+    });
+
+    // Tab switching
+    modal.querySelectorAll("[data-add-console-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => switchAddConsoleTab(btn.dataset.addConsoleTab));
+    });
+
+    // Test connection for new console
+    const testBtn = modal.querySelector("[data-test-add-console]");
+    if (testBtn) {
+      testBtn.addEventListener("click", async () => {
+        const form = document.getElementById("add-console-form");
+        const testArea = document.getElementById("add-console-test-area");
+        const outputEl = document.getElementById("add-console-test-output");
+        testBtn.disabled = true;
+        if (testArea) testArea.hidden = false;
+        if (outputEl) { outputEl.textContent = "Testing…"; outputEl.style.color = ""; }
+        try {
+          const formData = new FormData(form);
+          const response = await fetch("/setup/consoles/test-credentials", { method: "POST", body: formData });
+          const data = await response.json();
+          if (outputEl) {
+            outputEl.textContent = data.ok ? (data.message || "Connected.") : ("Error: " + (data.error || "Unknown error"));
+            outputEl.style.color = data.ok ? "var(--ok)" : "";
+          }
+        } catch (err) {
+          if (outputEl) outputEl.textContent = "Request failed: " + err.message;
+        } finally {
+          testBtn.disabled = false;
+        }
+      });
+    }
+
+    // Copy test result in modal
+    const copyBtn = modal.querySelector("[data-copy-add-console-test]");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        const outputEl = document.getElementById("add-console-test-output");
+        if (outputEl) navigator.clipboard.writeText(outputEl.textContent).catch(() => {});
+      });
+    }
+  }
+
+  function openAddConsoleModal() {
+    const modal = document.getElementById("add-console-modal");
+    if (!modal) return;
+    modal.hidden = false;
+    // All controls were bound at page load — just focus the first visible input
+    const firstInput = modal.querySelector("[data-add-console-section='direct'] input:not([type=hidden])");
+    if (firstInput && !firstInput.disabled) firstInput.focus();
+  }
+
+  function closeAddConsoleModal() {
+    const modal = document.getElementById("add-console-modal");
+    if (!modal) return;
+    modal.hidden = true;
+    // Reset form
+    const form = document.getElementById("add-console-form");
+    if (form) form.reset();
+    const testArea = document.getElementById("add-console-test-area");
+    if (testArea) testArea.hidden = true;
+    // Reset to Direct tab
+    switchAddConsoleTab("direct");
+  }
+
+  function switchAddConsoleTab(tab) {
+    const modal = document.getElementById("add-console-modal");
+    if (!modal) return;
+    modal.querySelectorAll("[data-add-console-tab]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.addConsoleTab === tab);
+    });
+    modal.querySelectorAll("[data-add-console-section]").forEach((section) => {
+      const isActive = section.dataset.addConsoleSection === tab;
+      section.hidden = !isActive;
+      // Disable inputs in inactive sections so they don't interfere with form submission
+      section.querySelectorAll("input:not([type=hidden]), select, textarea").forEach((input) => {
+        input.disabled = !isActive;
+      });
+    });
+    const typeField = document.getElementById("add-console-type-field");
+    if (typeField) typeField.value = tab === "cloud" ? "SITE_MANAGER" : "DIRECT";
+    // Clear test result when switching tabs
+    const testArea = document.getElementById("add-console-test-area");
+    if (testArea) testArea.hidden = true;
   }
 
   async function discoverSiteManagerHosts(event) {
@@ -457,12 +697,11 @@
     // Extract console id from URL: /setup/consoles/{id}/test
     const consoleId = testUrl.split("/").slice(-2, -1)[0];
     const resultEl = document.querySelector(`[data-test-result-${consoleId}]`);
+    const wrapperEl = document.getElementById(`test-wrapper-${consoleId}`);
 
     button.disabled = true;
-    if (resultEl) {
-      resultEl.style.display = "block";
-      resultEl.textContent = "Testing…";
-    }
+    if (wrapperEl) wrapperEl.hidden = false;
+    if (resultEl) resultEl.textContent = "Testing…";
 
     try {
       const response = await fetch(testUrl, { headers: { Accept: "application/json" } });
