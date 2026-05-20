@@ -5,7 +5,7 @@
 <section class="page-head">
   <div><h1>Cameras</h1><p>Discover cameras from UniFi Protect.</p></div>
   <div class="actions">
-    {{ camera_views.view_toggle("blink.camerasView") }}
+    {{ camera_views.view_toggle("blink.camerasView", initial_camera_view) }}
     <button class="button" type="button" data-refresh-snapshots>Refresh snapshots</button>
     <form method="post" action="/cameras/refresh"><button class="button primary">Refresh cameras</button></form>
   </div>

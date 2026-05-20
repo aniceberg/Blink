@@ -57,6 +57,12 @@ class JobRunner:
         def is_canceled() -> bool:
             return self.store.is_job_canceled(job.id)
 
+        def is_paused() -> bool:
+            return self.store.is_job_paused(job.id)
+
+        def is_stopped() -> bool:
+            return is_canceled() or is_paused()
+
         def mark_finished(status: JobStatus, message: str, **fields) -> None:
             self.store.update_job(
                 job.id,
@@ -152,6 +158,9 @@ class JobRunner:
                 current = self.store.get_job(job.id)
                 if current and current.status == JobStatus.CANCELED:
                     raise JobCanceled("Job canceled.")
+                if current and current.status == JobStatus.PAUSED:
+                    mark_finished(JobStatus.PAUSED, "Paused")
+                    return
                 self.store.update_job(job.id, progress=5 + (index - 1) * 70 / total_cameras, message=f"Extracting frames for {camera.name}")
                 extractor = FrameExtractor(self.store, clients[camera.console_id])
                 frames = await extractor.extract_for_camera(
@@ -179,7 +188,7 @@ class JobRunner:
                 frame_repeat=job.frame_repeat or 1,
                 output_dir=resolve_output_dir(settings.output_dir),
                 metadata=self._video_metadata(job, start_at, end_at),
-                should_cancel=is_canceled,
+                should_cancel=is_stopped,
             )
             self.store.update_job(job.id, progress=98, message="Finalizing output")
             self.store.add_artifact(
@@ -210,6 +219,8 @@ class JobRunner:
             if self.store.is_job_canceled(job.id):
                 mark_finished(JobStatus.CANCELED, "Canceled", error=None)
                 return
+            if self.store.is_job_paused(job.id):
+                return  # status already set to PAUSED via mark_finished above
             mark_finished(JobStatus.FAILED, "Failed", error=str(exc))
 
     def _video_metadata(self, job: Job, start_at: datetime, end_at: datetime) -> dict[str, str]:

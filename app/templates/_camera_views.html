@@ -1,7 +1,7 @@
-{% macro view_toggle(storage_key) -%}
-  <div class="segmented" data-camera-view-toggle data-storage-key="{{ storage_key }}" aria-label="Camera display mode">
-    <button type="button" class="segmented-button" data-view-choice="list" aria-pressed="true">List</button>
-    <button type="button" class="segmented-button" data-view-choice="grid" aria-pressed="false">Grid</button>
+{% macro view_toggle(storage_key, initial_view="list") -%}
+  <div class="segmented" data-camera-view-toggle data-storage-key="{{ storage_key }}" data-initial-view="{{ initial_view }}" aria-label="Camera display mode">
+    <button type="button" class="segmented-button" data-view-choice="list" aria-pressed="{{ 'true' if initial_view != 'grid' else 'false' }}">List</button>
+    <button type="button" class="segmented-button" data-view-choice="grid" aria-pressed="{{ 'true' if initial_view == 'grid' else 'false' }}">Grid</button>
   </div>
 {%- endmacro %}
 

@@ -165,6 +165,9 @@ class Store:
             self._ensure_column(conn, "consoles", "connection_type", "TEXT NOT NULL DEFAULT 'DIRECT'")
             self._ensure_column(conn, "consoles", "host_id", "TEXT")
             self._ensure_column(conn, "consoles", "sort_order", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(conn, "jobs", "priority", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(conn, "settings", "camera_view", "TEXT NOT NULL DEFAULT 'list'")
+            self._ensure_column(conn, "settings", "camera_picker_view", "TEXT NOT NULL DEFAULT 'list'")
             row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
             if row is None:
                 conn.execute("INSERT INTO settings (id, updated_at) VALUES (1, ?)", (utc_now(),))
@@ -251,6 +254,21 @@ class Store:
             timezone=row["timezone"],
             output_dir=row["output_dir"],
         )
+
+    def get_ui_pref(self, key: str) -> str:
+        allowed = {"camera_view", "camera_picker_view"}
+        if key not in allowed:
+            return "list"
+        with self.connect() as conn:
+            row = conn.execute(f"SELECT {key} FROM settings WHERE id = 1").fetchone()
+        return str(row[key]) if row and row[key] else "list"
+
+    def set_ui_pref(self, key: str, value: str) -> None:
+        allowed = {"camera_view", "camera_picker_view"}
+        if key not in allowed or value not in ("list", "grid"):
+            return
+        with self.connect() as conn:
+            conn.execute(f"UPDATE settings SET {key} = ?, updated_at = ? WHERE id = 1", (value, utc_now()))
 
     def save_settings(self, data: dict[str, Any]) -> None:
         with self.connect() as conn:
@@ -461,7 +479,10 @@ class Store:
 
     def next_queued_job(self) -> Job | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT * FROM jobs WHERE status = ? ORDER BY id LIMIT 1", (JobStatus.QUEUED.value,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM jobs WHERE status = ? ORDER BY priority DESC, id ASC LIMIT 1",
+                (JobStatus.QUEUED.value,),
+            ).fetchone()
         return self._row_to_job(row) if row else None
 
     def update_job(self, job_id: int, **fields: Any) -> None:
@@ -492,10 +513,35 @@ class Store:
     def cancel_job(self, job_id: int) -> None:
         self.update_job(job_id, status=JobStatus.CANCELED, message="Canceled")
 
+    def pause_job(self, job_id: int) -> None:
+        self.update_job(job_id, status=JobStatus.PAUSED, message="Paused")
+
+    def resume_job(self, job_id: int) -> None:
+        """Re-queue a paused job. Keeps existing frame manifest so re-run picks up quickly."""
+        self.update_job(job_id, status=JobStatus.QUEUED, message="Resumed", priority=0)
+
+    def promote_job(self, job_id: int) -> None:
+        """Move a queued job to the front by giving it highest priority."""
+        self.update_job(job_id, priority=1)
+
+    def count_active_jobs(self) -> int:
+        """Return count of QUEUED + RUNNING jobs (used for nav badge)."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM jobs WHERE status IN (?, ?)",
+                (JobStatus.QUEUED.value, JobStatus.RUNNING.value),
+            ).fetchone()
+        return int(row["n"])
+
     def is_job_canceled(self, job_id: int) -> bool:
         with self.connect() as conn:
             row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
         return bool(row and row["status"] == JobStatus.CANCELED.value)
+
+    def is_job_paused(self, job_id: int) -> bool:
+        with self.connect() as conn:
+            row = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        return bool(row and row["status"] == JobStatus.PAUSED.value)
 
     def increment_processed_frame_count(self, job_id: int, amount: int = 1) -> tuple[int, int]:
         with self.connect() as conn:

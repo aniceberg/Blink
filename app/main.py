@@ -580,16 +580,43 @@ async def setup_detect_host():
     return {"host": f"https://{gateway}", "gateway": gateway}
 
 
+@app.get("/api/prefs")
+async def get_prefs():
+    return JSONResponse({
+        "camera_view": store.get_ui_pref("camera_view"),
+        "camera_picker_view": store.get_ui_pref("camera_picker_view"),
+    })
+
+
+@app.post("/api/prefs")
+async def set_pref(request: Request):
+    data = await request.json()
+    key = data.get("key", "")
+    value = data.get("value", "list")
+    store.set_ui_pref(key, value)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/jobs/active-count")
+async def api_jobs_active_count():
+    return JSONResponse({"count": store.count_active_jobs()})
+
+
 @app.get("/cameras")
 async def cameras_get(request: Request):
-    return render(request, "cameras.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=store.list_consoles(enabled_only=True), error=None)
+    return render(request, "cameras.html",
+        cameras=store.list_cameras(enabled_consoles_only=True),
+        active_consoles=store.list_consoles(enabled_only=True),
+        initial_camera_view=store.get_ui_pref("camera_view"),
+        error=None,
+    )
 
 
 @app.post("/cameras/refresh")
 async def cameras_refresh(request: Request):
     consoles = store.list_consoles(enabled_only=True)
     if not consoles:
-        return render(request, "cameras.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=consoles, error="Configure and enable at least one UniFi console first.")
+        return render(request, "cameras.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=consoles, initial_camera_view=store.get_ui_pref("camera_view"), error="Configure and enable at least one UniFi console first.")
     errors: list[str] = []
     refreshed = 0
     for console in consoles:
@@ -607,7 +634,7 @@ async def cameras_refresh(request: Request):
         message = "; ".join(errors)
         if refreshed:
             message = f"Refreshed {refreshed} console(s), but some failed: {message}"
-        return render(request, "cameras.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=consoles, error=message)
+        return render(request, "cameras.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=consoles, initial_camera_view=store.get_ui_pref("camera_view"), error=message)
     return RedirectResponse("/cameras", status_code=303)
 
 
@@ -643,7 +670,12 @@ async def jobs_get(request: Request):
 
 @app.get("/jobs/new")
 async def job_new_get(request: Request):
-    return render(request, "job_new.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=store.list_consoles(enabled_only=True), error=None)
+    return render(request, "job_new.html",
+        cameras=store.list_cameras(enabled_consoles_only=True),
+        active_consoles=store.list_consoles(enabled_only=True),
+        initial_picker_view=store.get_ui_pref("camera_picker_view"),
+        error=None,
+    )
 
 
 @app.post("/jobs/new")
@@ -730,6 +762,30 @@ async def job_new_post(
         return RedirectResponse(f"/jobs/{job_id}", status_code=303)
     except Exception as exc:
         return render(request, "job_new.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=store.list_consoles(enabled_only=True), error=str(exc))
+
+
+@app.post("/jobs/{job_id}/pause")
+async def job_pause(job_id: int):
+    job = store.get_job(job_id)
+    if job and job.status == JobStatus.RUNNING:
+        store.pause_job(job_id)
+    return RedirectResponse("/jobs", status_code=303)
+
+
+@app.post("/jobs/{job_id}/resume")
+async def job_resume(job_id: int):
+    job = store.get_job(job_id)
+    if job and job.status == JobStatus.PAUSED:
+        store.resume_job(job_id)
+    return RedirectResponse("/jobs", status_code=303)
+
+
+@app.post("/jobs/{job_id}/start")
+async def job_start(job_id: int):
+    job = store.get_job(job_id)
+    if job and job.status == JobStatus.QUEUED:
+        store.promote_job(job_id)
+    return RedirectResponse("/jobs", status_code=303)
 
 
 @app.get("/jobs/{job_id}")

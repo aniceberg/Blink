@@ -27,7 +27,7 @@
     });
   }
 
-  function setView(root, view, storageKey) {
+  function setView(root, view, storageKey, persist) {
     root.querySelectorAll("[data-camera-view]").forEach((panel) => {
       const active = panel.dataset.cameraView === view;
       panel.hidden = !active;
@@ -43,13 +43,29 @@
     });
 
     localStorage.setItem(storageKey, view);
+
+    // Persist to server when triggered by user interaction (not initial load)
+    if (persist !== false) {
+      const prefKey = storageKey === "blink.camerasView" ? "camera_view"
+                    : storageKey === "blink.cameraPickerView" ? "camera_picker_view"
+                    : null;
+      if (prefKey) {
+        fetch("/api/prefs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: prefKey, value: view }),
+        }).catch(() => {});
+      }
+    }
   }
 
   function setupRoot(root) {
     const toggle = root.closest("main").querySelector("[data-camera-view-toggle]");
     const storageKey = toggle ? toggle.dataset.storageKey : "blink.cameraView";
-    const saved = localStorage.getItem(storageKey) || "list";
-    setView(root, saved === "grid" ? "grid" : "list", storageKey);
+    // Prefer server-persisted value (data-initial-view) over localStorage
+    const serverView = toggle ? toggle.dataset.initialView : null;
+    const saved = serverView || localStorage.getItem(storageKey) || "list";
+    setView(root, saved === "grid" ? "grid" : "list", storageKey, false);
 
     if (toggle) {
       toggle.querySelectorAll("[data-view-choice]").forEach((button) => {
@@ -148,6 +164,24 @@
     setupEstimatedLength();
     setupSetupControls();
     startJobStatusPolling();
+    startNavBadgePoll();
+  }
+
+  function startNavBadgePoll() {
+    const badge = document.getElementById("nav-jobs-badge");
+    if (!badge) return;
+    async function tick() {
+      try {
+        const r = await fetch("/api/jobs/active-count", { headers: { Accept: "application/json" } });
+        const { count } = await r.json();
+        badge.textContent = count;
+        badge.hidden = count === 0;
+      } catch (_) {}
+    }
+    tick();
+    if (!window._navBadgeInterval) {
+      window._navBadgeInterval = setInterval(tick, 4000);
+    }
   }
 
   function setupEstimatedLength() {
