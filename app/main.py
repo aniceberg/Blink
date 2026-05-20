@@ -606,6 +606,15 @@ async def api_jobs_active_count():
     return JSONResponse({"count": store.count_active_jobs()})
 
 
+@app.get("/api/jobs/list")
+async def api_jobs_list():
+    jobs = store.list_jobs()
+    return JSONResponse(
+        [{"id": j.id, "status": j.status.value, "progress": round(j.progress)} for j in jobs],
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/cameras")
 async def cameras_get(request: Request):
     return render(request, "cameras.html",

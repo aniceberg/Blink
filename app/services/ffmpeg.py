@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from time import monotonic
 from typing import Callable
@@ -69,6 +70,7 @@ def ffmpeg_command() -> str:
     return "ffmpeg"
 
 
+@lru_cache(maxsize=1)
 def check_ffmpeg() -> FFmpegStatus:
     paths = resolve_ffmpeg_paths()
     ffmpeg_path = paths.ffmpeg_path

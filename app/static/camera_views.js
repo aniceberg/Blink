@@ -166,6 +166,41 @@
     setupSetupControls();
     startJobStatusPolling();
     startNavBadgePoll();
+    startJobsListPoll();
+  }
+
+  function startJobsListPoll() {
+    const tbody = document.querySelector("[data-jobs-list]");
+    if (!tbody) return;
+
+    const activeStatuses = new Set(["queued", "running", "paused"]);
+    const getRows = () => tbody.querySelectorAll("[data-job-row]");
+    const hasActive = () => Array.from(getRows()).some((r) => activeStatuses.has(r.dataset.jobStatus));
+
+    if (!hasActive()) return; // nothing running — no need to poll
+
+    async function tick() {
+      try {
+        const r = await fetch("/api/jobs/list", { headers: { Accept: "application/json" } });
+        if (!r.ok) return;
+        const jobs = await r.json();
+        const jobMap = new Map(jobs.map((j) => [String(j.id), j]));
+
+        let needsReload = jobs.length !== getRows().length;
+        getRows().forEach((row) => {
+          const job = jobMap.get(row.dataset.jobRow);
+          if (!job) { needsReload = true; return; }
+          if (row.dataset.jobStatus !== job.status) needsReload = true;
+          // Update progress % in place — no reload needed for this
+          const cell = row.querySelector("[data-job-progress-cell]");
+          if (cell) cell.textContent = job.progress + "%";
+        });
+
+        if (needsReload) location.reload();
+      } catch (_) {}
+    }
+
+    setInterval(tick, 3000);
   }
 
   function startNavBadgePoll() {

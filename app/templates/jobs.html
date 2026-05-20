@@ -9,12 +9,12 @@
   {% if jobs %}
     <table>
       <thead><tr><th>ID</th><th>Cameras</th><th>Status</th><th>Range</th><th>Daily Window</th><th>Interval</th><th>Scale</th><th>Progress</th><th>Created</th><th></th></tr></thead>
-      <tbody>
+      <tbody data-jobs-list>
         {% for job in jobs %}
           {% set range_start = job.resolved_start_at or job.start_at %}
           {% set range_end = job.resolved_end_at or job.end_at %}
           {% set s = job.status.value %}
-          <tr>
+          <tr data-job-row="{{ job.id }}" data-job-status="{{ s }}">
             <td><a href="/jobs/{{ job.id }}">#{{ job.id }}</a></td>
             <td>{{ job.camera_names|join(", ") }}</td>
             <td>
@@ -31,7 +31,7 @@
             <td>{{ job.daily_start ~ "-" ~ job.daily_end if job.daily_window_enabled else "Full day" }}</td>
             <td>{{ job.sample_interval_seconds }}s</td>
             <td>{{ describe_output_scale(job.output_scale_mode, job.output_scale_width) }}</td>
-            <td>{{ "%.0f"|format(job.progress) }}%</td>
+            <td data-job-progress-cell>{{ "%.0f"|format(job.progress) }}%</td>
             <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
             <td class="cell-actions">
               {% if s == "queued" %}
