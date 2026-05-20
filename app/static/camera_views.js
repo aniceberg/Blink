@@ -200,7 +200,8 @@
       } catch (_) {}
     }
 
-    setInterval(tick, 3000);
+    tick();                  // fire immediately so a just-reloaded page catches changes within ~100ms
+    setInterval(tick, 1500); // then every 1.5s while active jobs exist
   }
 
   function startNavBadgePoll() {
