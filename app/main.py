@@ -256,7 +256,11 @@ def safe_job_thumbnail_path(job_id: int) -> Path:
 async def home(request: Request):
     cameras = store.list_cameras()
     jobs = store.list_jobs(limit=8)
-    return render(request, "dashboard.html", cameras=cameras, jobs=jobs)
+    return render(request, "dashboard.html",
+        cameras=cameras,
+        jobs=jobs,
+        initial_camera_view=store.get_ui_pref("camera_view"),
+    )
 
 
 _timezones = sorted(available_timezones())
@@ -670,10 +674,14 @@ async def jobs_get(request: Request):
 
 @app.get("/jobs/new")
 async def job_new_get(request: Request):
+    settings = store.get_settings()
+    from zoneinfo import ZoneInfo
+    today = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y-%m-%d")
     return render(request, "job_new.html",
         cameras=store.list_cameras(enabled_consoles_only=True),
         active_consoles=store.list_consoles(enabled_only=True),
         initial_picker_view=store.get_ui_pref("camera_picker_view"),
+        today=today,
         error=None,
     )
 
@@ -761,7 +769,10 @@ async def job_new_post(
         job_id = store.create_job(data, [camera.name for camera in cameras])
         return RedirectResponse(f"/jobs/{job_id}", status_code=303)
     except Exception as exc:
-        return render(request, "job_new.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=store.list_consoles(enabled_only=True), error=str(exc))
+        settings = store.get_settings()
+        from zoneinfo import ZoneInfo
+        today = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y-%m-%d")
+        return render(request, "job_new.html", cameras=store.list_cameras(enabled_consoles_only=True), active_consoles=store.list_consoles(enabled_only=True), initial_picker_view=store.get_ui_pref("camera_picker_view"), today=today, error=str(exc))
 
 
 @app.post("/jobs/{job_id}/pause")
@@ -837,7 +848,7 @@ async def job_cancel(job_id: int):
     job = store.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
-    if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+    if job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}:
         store.cancel_job(job_id)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 

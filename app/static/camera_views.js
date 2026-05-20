@@ -46,7 +46,7 @@
 
     // Persist to server when triggered by user interaction (not initial load)
     if (persist !== false) {
-      const prefKey = storageKey === "blink.camerasView" ? "camera_view"
+      const prefKey = (storageKey === "blink.camerasView" || storageKey === "blink.dashboardCamerasView") ? "camera_view"
                     : storageKey === "blink.cameraPickerView" ? "camera_picker_view"
                     : null;
       if (prefKey) {
@@ -62,9 +62,10 @@
   function setupRoot(root) {
     const toggle = root.closest("main").querySelector("[data-camera-view-toggle]");
     const storageKey = toggle ? toggle.dataset.storageKey : "blink.cameraView";
-    // Prefer server-persisted value (data-initial-view) over localStorage
+    // localStorage is always current within the session (updated synchronously on every toggle).
+    // Server value (data-initial-view) is only the fallback for fresh sessions where localStorage is empty.
     const serverView = toggle ? toggle.dataset.initialView : null;
-    const saved = serverView || localStorage.getItem(storageKey) || "list";
+    const saved = localStorage.getItem(storageKey) || serverView || "list";
     setView(root, saved === "grid" ? "grid" : "list", storageKey, false);
 
     if (toggle) {
@@ -894,7 +895,7 @@
       if (rangeEnd) rangeEnd.textContent = formatDateTime(data.resolved_end_at);
       if (dailyWindow) dailyWindow.textContent = data.daily_window_enabled ? `${data.daily_start}-${data.daily_end}` : "Full day";
       if (counts) counts.textContent = `${data.processed_frame_count} of ${data.planned_frame_count} requested frame timestamps processed`;
-      return data.status === "queued" || data.status === "running";
+      return data.status === "queued" || data.status === "running" || data.status === "paused";
     }
 
     async function refreshFrames() {

@@ -21,7 +21,7 @@
     <div class="section-title">
       <h2>Cameras</h2>
       <div class="actions">
-        {{ camera_views.view_toggle("blink.dashboardCamerasView") }}
+        {{ camera_views.view_toggle("blink.dashboardCamerasView", initial_camera_view) }}
         <button class="button" type="button" data-refresh-snapshots>Snapshots</button>
         <form method="post" action="/cameras/refresh"><button class="button">Refresh</button></form>
       </div>

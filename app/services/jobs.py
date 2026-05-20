@@ -80,6 +80,10 @@ class JobRunner:
                 progress=progress,
                 message=f"Processed {processed:,} of {planned:,} requested frame timestamps",
             )
+            # Check pause/cancel after every progress update so the worker
+            # can stop mid-extraction rather than waiting for the next camera boundary.
+            if is_stopped():
+                raise JobCanceled("Stopped during extraction.")
 
         ffmpeg = check_ffmpeg()
         encoder = job.encoder or DEFAULT_ENCODER
@@ -172,6 +176,14 @@ class JobRunner:
                 )
                 all_frames.extend(frames)
 
+            # Check pause/cancel after all extraction completes, before encoding starts.
+            current = self.store.get_job(job.id)
+            if current and current.status == JobStatus.PAUSED:
+                mark_finished(JobStatus.PAUSED, "Paused")
+                return
+            if current and current.status == JobStatus.CANCELED:
+                raise JobCanceled("Job canceled.")
+
             if not all_frames:
                 raise RuntimeError("No frames were extracted. Check job logs for UniFi API errors or recording gaps.")
 
@@ -214,7 +226,11 @@ class JobRunner:
                 finished_at=utc_now(),
             )
         except JobCanceled:
-            mark_finished(JobStatus.CANCELED, "Canceled", error=None)
+            # A JobCanceled raised while paused should land as PAUSED, not CANCELED.
+            if self.store.is_job_paused(job.id):
+                mark_finished(JobStatus.PAUSED, "Paused")
+            else:
+                mark_finished(JobStatus.CANCELED, "Canceled", error=None)
         except Exception as exc:
             if self.store.is_job_canceled(job.id):
                 mark_finished(JobStatus.CANCELED, "Canceled", error=None)

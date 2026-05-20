@@ -10,7 +10,7 @@
   </div>
   <div class="actions">
     {% if job.output_path %}<button class="button primary" type="button" data-reveal-job data-reveal-url="/jobs/{{ job.id }}/reveal">Reveal in Finder</button>{% endif %}
-    {% if job.status.value in ["queued", "running"] %}
+    {% if job.status.value in ["queued", "running", "paused"] %}
       <form method="post" action="/jobs/{{ job.id }}/cancel"><button class="button danger">Cancel</button></form>
     {% else %}
       <form method="post" action="/jobs/{{ job.id }}/retry"><button class="button">Retry</button></form>
@@ -39,7 +39,7 @@
 </div>
 {% endif %}
 
-<section class="panel job-status-panel" data-job-status-url="/jobs/{{ job.id }}/status" data-job-active="{{ '1' if job.status.value in ['queued', 'running'] else '0' }}">
+<section class="panel job-status-panel" data-job-status-url="/jobs/{{ job.id }}/status" data-job-active="{{ '1' if job.status.value in ['queued', 'running', 'paused'] else '0' }}">
   <div class="detail-grid">
     <div>
       <span>Start</span>
