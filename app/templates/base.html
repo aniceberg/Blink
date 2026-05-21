@@ -28,7 +28,7 @@
       </nav>
     </header>
     <main class="shell">
-      {% if not ffmpeg.ok %}
+      {% if ffmpeg.source != 'pending' and not ffmpeg.ok %}
         <div class="notice error">
           {{ ffmpeg.message }} HEVC jobs will remain failed until a supported encoder is available.
         </div>

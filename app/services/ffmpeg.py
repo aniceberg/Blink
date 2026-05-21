@@ -4,8 +4,8 @@ import asyncio
 import os
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from time import monotonic
 from typing import Callable
@@ -70,14 +70,20 @@ def ffmpeg_command() -> str:
     return "ffmpeg"
 
 
-@lru_cache(maxsize=1)
-def check_ffmpeg() -> FFmpegStatus:
+_PENDING_STATUS = FFmpegStatus(None, None, "pending", False, False, "Checking FFmpeg…")
+_ffmpeg_result: FFmpegStatus | None = None
+_ffmpeg_ready = threading.Event()   # set once the result is stored
+_ffmpeg_lock = threading.Lock()     # guards _ffmpeg_result writes
+_warmup_started = False             # prevents duplicate warmup threads
+
+
+def _run_check() -> FFmpegStatus:
+    """Execute the blocking FFmpeg probe. Always called from a background thread."""
     paths = resolve_ffmpeg_paths()
     ffmpeg_path = paths.ffmpeg_path
     ffprobe_path = paths.ffprobe_path
     if not ffmpeg_path:
         return FFmpegStatus(None, ffprobe_path, paths.source, False, False, "FFmpeg is not installed or bundled.")
-
     try:
         result = subprocess.run(
             [ffmpeg_path, "-hide_banner", "-encoders"],
@@ -88,7 +94,6 @@ def check_ffmpeg() -> FFmpegStatus:
         )
     except Exception as exc:
         return FFmpegStatus(ffmpeg_path, ffprobe_path, paths.source, False, False, f"Could not inspect FFmpeg encoders: {exc}")
-
     encoders = f"{result.stdout}\n{result.stderr}"
     has_libx265 = "libx265" in encoders
     has_hevc_videotoolbox = "hevc_videotoolbox" in encoders
@@ -98,6 +103,45 @@ def check_ffmpeg() -> FFmpegStatus:
     if has_libx265:
         return FFmpegStatus(ffmpeg_path, ffprobe_path, paths.source, True, False, f"{source_label.title()} FFmpeg with libx265 is available. Apple VideoToolbox HEVC is not available in this runtime.")
     return FFmpegStatus(ffmpeg_path, ffprobe_path, paths.source, False, False, "FFmpeg is available, but no HEVC encoder was found.")
+
+
+def _warmup_worker() -> None:
+    global _ffmpeg_result
+    status = _run_check()
+    with _ffmpeg_lock:
+        _ffmpeg_result = status
+    _ffmpeg_ready.set()
+
+
+def start_ffmpeg_warmup() -> None:
+    """Spawn a daemon thread to run the FFmpeg probe so startup never blocks the event loop."""
+    global _warmup_started
+    with _ffmpeg_lock:
+        if _warmup_started:
+            return
+        _warmup_started = True
+    threading.Thread(target=_warmup_worker, name="ffmpeg-warmup", daemon=True).start()
+
+
+def check_ffmpeg() -> FFmpegStatus:
+    """Non-blocking. Returns the cached result, or PENDING while warmup is still running."""
+    return _ffmpeg_result if _ffmpeg_ready.is_set() else _PENDING_STATUS
+
+
+def check_ffmpeg_ready() -> FFmpegStatus:
+    """Blocking. Waits for the warmup thread (or starts one if needed).
+    IMPORTANT: always call this from a thread/executor — never directly on the asyncio event loop."""
+    global _ffmpeg_result
+    # Start warmup if somehow it was never kicked off (e.g. unit-test paths).
+    start_ffmpeg_warmup()
+    # Block this thread until the result is ready (≤60 s safety timeout).
+    if not _ffmpeg_ready.wait(timeout=60):
+        # Timed out — store a failure result so callers don't wait again.
+        with _ffmpeg_lock:
+            if _ffmpeg_result is None:
+                _ffmpeg_result = FFmpegStatus(None, None, "pending", False, False, "FFmpeg check timed out.")
+        _ffmpeg_ready.set()
+    return _ffmpeg_result  # type: ignore[return-value]
 
 
 def _decode_output(stdout: bytes | None, stderr: bytes | None) -> str:

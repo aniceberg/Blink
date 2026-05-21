@@ -10,7 +10,7 @@ from app.models import Job, JobStatus
 from app.paths import resolve_output_dir
 from app.services.cancel import JobCanceled
 from app.services.extractor import FrameExtractor
-from app.services.ffmpeg import check_ffmpeg
+from app.services.ffmpeg import check_ffmpeg_ready
 from app.services.timeline import TimelinePlanner
 from app.services.unifi import UniFiClient
 from app.services.video import VideoAssembler
@@ -85,7 +85,9 @@ class JobRunner:
             if is_stopped():
                 raise JobCanceled("Stopped during extraction.")
 
-        ffmpeg = check_ffmpeg()
+        # Run the blocking FFmpeg probe in a thread so the event loop stays free.
+        loop = asyncio.get_event_loop()
+        ffmpeg = await loop.run_in_executor(None, check_ffmpeg_ready)
         encoder = job.encoder or DEFAULT_ENCODER
         if not ffmpeg.supports(encoder):
             self.store.update_job(

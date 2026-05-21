@@ -79,8 +79,18 @@ NOTICE
   launcher.py
 
 if [[ -d "$ROOT_DIR/dist/Blink.app" ]]; then
-  xattr -cr "$ROOT_DIR/dist/Blink.app" 2>/dev/null || true
-  find "$ROOT_DIR/dist/Blink.app" -exec xattr -d com.apple.provenance {} \; 2>/dev/null || true
+  # Patch Info.plist: allow WKWebView to load the local HTTP server.
+  # Without NSAllowsLocalNetworking, macOS App Transport Security blocks
+  # plain-HTTP connections to 127.0.0.1 and causes an ~8-second timeout
+  # before the first page renders.
+  PLIST="$ROOT_DIR/dist/Blink.app/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" "$PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsLocalNetworking true" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" "$PLIST"
+
+  xattr -d com.apple.FinderInfo "$ROOT_DIR/dist/Blink.app" 2>/dev/null || true
   if ! codesign -s - --force --deep --all-architectures "$ROOT_DIR/dist/Blink.app"; then
     echo "Built app, but ad-hoc codesigning failed. It is still an unsigned local build."
   fi

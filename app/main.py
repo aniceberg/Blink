@@ -31,7 +31,7 @@ from app.config import (
 from app.compat import ensure_importlib_resources
 from app.models import JobStatus
 from app.paths import resolve_output_dir
-from app.services.ffmpeg import check_ffmpeg
+from app.services.ffmpeg import check_ffmpeg, start_ffmpeg_warmup
 from app.services.jobs import JobRunner, describe_output_scale
 from app.services.snapshots import SnapshotCache
 from app.services.site_manager import list_hosts as sm_list_hosts
@@ -60,6 +60,7 @@ templates.env.cache = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    start_ffmpeg_warmup()   # probes FFmpeg in a background thread; non-blocking
     runner.start()
     asyncio.create_task(check_for_update(APP_VERSION))
     yield
@@ -853,13 +854,14 @@ async def job_retry(job_id: int):
 
 
 @app.post("/jobs/{job_id}/cancel")
-async def job_cancel(job_id: int):
+async def job_cancel(job_id: int, next_page: str = Query("detail", alias="next")):
     job = store.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
     if job.status in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED}:
         store.cancel_job(job_id)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+    target = "/jobs" if next_page == "list" else f"/jobs/{job_id}"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/jobs/{job_id}/delete")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -35,6 +36,7 @@ SNAPSHOT_STRATEGY_THRESHOLD_SECONDS = 30
 VIDEO_EXPORT_CHUNK_SECONDS = 900
 
 
+@lru_cache(maxsize=1)
 def resource_roots() -> list[Path]:
     roots: list[Path] = []
     if getattr(sys, "frozen", False):
