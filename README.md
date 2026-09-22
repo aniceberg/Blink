@@ -19,6 +19,8 @@ Open `http://127.0.0.1:8000`.
 
 Configure the completed videos directory on the Setup page. Absolute paths, `~`, and paths relative to this project are supported; each completed job writes to a `job_ID` folder in that directory.
 
+Blink stores extracted frames in its own application frame cache only while a job is being processed. By default, a successfully completed job discards those generated frames after its video and thumbnail have been saved, while preserving the completed output, thumbnail, and job history. On startup, Blink also removes leftover frame caches from earlier completed jobs that did not opt into retention. Enable **Keep generated frames after completion** on an individual job only when you need intermediates for troubleshooting. Failed, canceled, paused, running, and unknown job folders retain their frame cache.
+
 The host should normally be the UniFi OS console, for example `https://192.168.1.1`. Blink uses:
 
 - Official integration endpoints under `/proxy/protect/integration/v1` for camera discovery.

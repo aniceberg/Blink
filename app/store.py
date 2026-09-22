@@ -111,6 +111,7 @@ class Store:
                     output_scale_mode TEXT NOT NULL DEFAULT 'original',
                     output_scale_width INTEGER,
                     frame_repeat INTEGER NOT NULL DEFAULT 1,
+                    keep_intermediate_frames INTEGER NOT NULL DEFAULT 0,
                     progress REAL NOT NULL DEFAULT 0,
                     planned_frame_count INTEGER NOT NULL DEFAULT 0,
                     processed_frame_count INTEGER NOT NULL DEFAULT 0,
@@ -162,6 +163,7 @@ class Store:
             self._ensure_column(conn, "jobs", "resolved_start_at", "TEXT")
             self._ensure_column(conn, "jobs", "resolved_end_at", "TEXT")
             self._ensure_column(conn, "jobs", "frame_repeat", "INTEGER NOT NULL DEFAULT 1")
+            self._ensure_column(conn, "jobs", "keep_intermediate_frames", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(conn, "consoles", "connection_type", "TEXT NOT NULL DEFAULT 'DIRECT'")
             self._ensure_column(conn, "consoles", "host_id", "TEXT")
             self._ensure_column(conn, "consoles", "sort_order", "INTEGER NOT NULL DEFAULT 0")
@@ -438,8 +440,9 @@ class Store:
                     status, camera_ids_json, camera_names_json, start_at, end_at, earliest_available,
                     daily_window_enabled, daily_start, daily_end, sample_interval_seconds, output_fps, encoder,
                     videotoolbox_quality, x265_crf, x265_preset, output_scale_mode, output_scale_width, frame_repeat,
+                    keep_intermediate_frames,
                     progress, message, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
                 """,
                 (
                     JobStatus.QUEUED.value,
@@ -460,6 +463,7 @@ class Store:
                     data.get("output_scale_mode", "original"),
                     data.get("output_scale_width"),
                     data.get("frame_repeat", 1),
+                    1 if data.get("keep_intermediate_frames") else 0,
                     "Queued",
                     now,
                     now,
@@ -470,6 +474,19 @@ class Store:
     def list_jobs(self, limit: int = 100) -> list[Job]:
         with self.connect() as conn:
             rows = conn.execute("SELECT * FROM jobs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [self._row_to_job(row) for row in rows]
+
+    def list_completed_jobs_discarding_frame_cache(self) -> list[Job]:
+        """Return every completed job eligible for automatic frame-cache cleanup."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM jobs
+                WHERE status = ? AND keep_intermediate_frames = 0
+                ORDER BY id
+                """,
+                (JobStatus.COMPLETED.value,),
+            ).fetchall()
         return [self._row_to_job(row) for row in rows]
 
     def get_job(self, job_id: int) -> Job | None:
@@ -645,6 +662,7 @@ class Store:
             output_scale_mode=row["output_scale_mode"],
             output_scale_width=row["output_scale_width"],
             frame_repeat=row["frame_repeat"] if "frame_repeat" in row.keys() else 1,
+            keep_intermediate_frames=bool(row["keep_intermediate_frames"]) if "keep_intermediate_frames" in row.keys() else False,
             progress=row["progress"],
             planned_frame_count=row["planned_frame_count"],
             processed_frame_count=row["processed_frame_count"],

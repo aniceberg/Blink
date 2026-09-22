@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from app.config import DEFAULT_ENCODER, DEFAULT_VIDEOTOOLBOX_QUALITY, DEFAULT_X265_CRF, DEFAULT_X265_PRESET
 from app.models import Job, JobStatus
-from app.paths import resolve_output_dir
+from app.paths import delete_job_frame_cache, resolve_output_dir
 from app.services.cancel import JobCanceled
 from app.services.extractor import FrameExtractor
 from app.services.ffmpeg import check_ffmpeg_ready
@@ -227,6 +227,13 @@ class JobRunner:
                 error=None,
                 finished_at=utc_now(),
             )
+            if not job.keep_intermediate_frames:
+                try:
+                    delete_job_frame_cache(job.id)
+                except (OSError, ValueError):
+                    # The output has already been recorded, so cleanup trouble must not
+                    # turn a successful timelapse into a failed one.
+                    self.store.update_job(job.id, message="Completed; generated frames could not be discarded")
         except JobCanceled:
             # A JobCanceled raised while paused should land as PAUSED, not CANCELED.
             if self.store.is_job_paused(job.id):

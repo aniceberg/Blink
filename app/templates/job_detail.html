@@ -69,6 +69,7 @@
   <div class="progress"><div data-job-progress-bar style="width: {{ job.progress }}%"></div></div>
   <p data-job-message>{{ job.message }}</p>
   <p class="field-help" data-job-counts>{{ job.processed_frame_count }} of {{ job.planned_frame_count }} requested frame timestamps processed</p>
+  <p class="field-help">Generated frames: {{ "retained for troubleshooting" if job.keep_intermediate_frames else "discarded after successful completion" }}</p>
   {% if job.error %}<pre class="error-box">{{ job.error }}</pre>{% endif %}
 </section>
 

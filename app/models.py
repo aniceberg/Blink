@@ -85,6 +85,7 @@ class Job:
     output_scale_mode: str
     output_scale_width: int | None
     frame_repeat: int
+    keep_intermediate_frames: bool
     progress: float
     planned_frame_count: int
     processed_frame_count: int

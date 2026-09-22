@@ -106,6 +106,16 @@ def test_new_job_output_resolution_controls_default_to_original():
     assert 'data-output-scale-custom class="disabled-field"' in response.text
 
 
+def test_new_job_defaults_to_discarding_generated_frames_after_completion():
+    client = TestClient(main.app)
+    response = client.get("/jobs/new")
+
+    assert response.status_code == 200
+    assert 'name="keep_intermediate_frames"' in response.text
+    assert 'name="keep_intermediate_frames" checked' not in response.text
+    assert "discards the generated frame cache after a completed video and thumbnail are recorded" in response.text
+
+
 def test_daily_window_rejects_same_day_overnight_window():
     try:
         main.validate_daily_window_range(

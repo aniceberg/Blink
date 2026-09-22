@@ -39,8 +39,36 @@ def test_store_persists_new_job_progress_and_timing_fields(tmp_path):
     assert job.daily_window_enabled is False
     assert job.output_scale_mode == "max_1920"
     assert job.output_scale_width == 1920
+    assert job.keep_intermediate_frames is False
     assert job.processed_frame_count == 3
     assert job.started_at.isoformat() == "2026-05-10T14:00:00+00:00"
+
+
+def test_store_persists_keep_intermediate_frames(tmp_path):
+    store = Store(tmp_path / "blink.sqlite3")
+    job_id = store.create_job(
+        {
+            "camera_ids": ["camera-1"],
+            "start_at": None,
+            "end_at": None,
+            "earliest_available": True,
+            "daily_window_enabled": False,
+            "daily_start": "00:00:00",
+            "daily_end": "23:59:59",
+            "sample_interval_seconds": 60,
+            "output_fps": 30,
+            "encoder": "hevc_videotoolbox",
+            "videotoolbox_quality": 65,
+            "x265_crf": 28,
+            "x265_preset": "medium",
+            "output_scale_mode": "original",
+            "output_scale_width": None,
+            "keep_intermediate_frames": True,
+        },
+        ["Front NE"],
+    )
+
+    assert store.get_job(job_id).keep_intermediate_frames is True
 
 
 def test_existing_single_console_settings_migrate_to_console(tmp_path):

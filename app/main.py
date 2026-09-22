@@ -22,7 +22,6 @@ from app.config import (
     DEFAULT_X265_CRF,
     DEFAULT_X265_PRESET,
     EXPORTS_DIR,
-    FRAMES_DIR,
     MEDIA_DIR,
     PROJECT_ROOT,
     ensure_data_dirs,
@@ -30,8 +29,9 @@ from app.config import (
 )
 from app.compat import ensure_importlib_resources
 from app.models import JobStatus
-from app.paths import resolve_output_dir
+from app.paths import delete_job_frame_cache, resolve_output_dir
 from app.services.ffmpeg import check_ffmpeg, start_ffmpeg_warmup
+from app.services.frame_cleanup import cleanup_completed_frame_caches
 from app.services.jobs import JobRunner, describe_output_scale
 from app.services.snapshots import SnapshotCache
 from app.services.site_manager import list_hosts as sm_list_hosts
@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     start_ffmpeg_warmup()   # probes FFmpeg in a background thread; non-blocking
     runner.start()
     asyncio.create_task(check_for_update(APP_VERSION))
+    asyncio.create_task(asyncio.to_thread(cleanup_completed_frame_caches, store))
     yield
     await runner.stop()
 
@@ -206,8 +207,12 @@ def cleanup_job_files(job_id: int) -> None:
     if not job:
         return
     settings_output_dir = resolve_output_dir(store.get_settings().output_dir)
-    allowed_roots = [settings_output_dir, MEDIA_DIR, FRAMES_DIR, EXPORTS_DIR, PROJECT_ROOT / "data"]
-    candidates = [FRAMES_DIR / f"job_{job_id}", EXPORTS_DIR / f"job_{job_id}"]
+    allowed_roots = [settings_output_dir, MEDIA_DIR, EXPORTS_DIR, PROJECT_ROOT / "data"]
+    candidates = [EXPORTS_DIR / f"job_{job_id}"]
+    try:
+        delete_job_frame_cache(job_id)
+    except OSError:
+        pass
     for raw_path in (job.output_path, job.thumbnail_path):
         if raw_path:
             path = Path(raw_path)
@@ -709,6 +714,7 @@ async def job_new_post(
     interval_amount: int = Form(1),
     interval_unit: str = Form("minute"),
     frame_repeat: int = Form(1),
+    keep_intermediate_frames: str | None = Form(None),
     output_fps: int = Form(DEFAULT_OUTPUT_FPS),
     encoder: str = Form(DEFAULT_ENCODER),
     videotoolbox_quality: int = Form(DEFAULT_VIDEOTOOLBOX_QUALITY),
@@ -771,6 +777,7 @@ async def job_new_post(
             "output_scale_mode": scale_mode,
             "output_scale_width": scale_width,
             "frame_repeat": frame_repeat,
+            "keep_intermediate_frames": bool(keep_intermediate_frames),
         }
         if data["start_at"] and data["end_at"] and data["end_at"] < data["start_at"]:
             raise ValueError("End date must be on or after the start date.")
