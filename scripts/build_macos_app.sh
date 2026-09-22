@@ -61,6 +61,7 @@ OSXExperts builds: https://www.osxexperts.net/
 NOTICE
 
 "$PYTHON_BIN" -m pip install -e ".[macos]"
+APP_VERSION="$("$PYTHON_BIN" -c 'from app import __version__; print(__version__)')"
 
 "$PYTHON_BIN" -m PyInstaller \
   --name Blink \
@@ -68,7 +69,7 @@ NOTICE
   --icon "$ROOT_DIR/Blink.icns" \
   --clean \
   --noconfirm \
-  --collect-all webview \
+  --hidden-import webview.platforms.cocoa \
   --collect-submodules uvicorn \
   --collect-submodules httptools \
   --collect-submodules websockets \
@@ -89,11 +90,18 @@ if [[ -d "$ROOT_DIR/dist/Blink.app" ]]; then
     /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsLocalNetworking true" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null || \
     /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_VERSION" "$PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" "$PLIST"
 
-  xattr -d com.apple.FinderInfo "$ROOT_DIR/dist/Blink.app" 2>/dev/null || true
+  # PyInstaller may preserve Finder metadata from copied Python frameworks.
+  # Clear it only from the generated bundle before applying its local signature.
+  xattr -cr "$ROOT_DIR/dist/Blink.app" 2>/dev/null || true
   if ! codesign -s - --force --deep --all-architectures "$ROOT_DIR/dist/Blink.app"; then
     echo "Built app, but ad-hoc codesigning failed. It is still an unsigned local build."
   fi
 fi
+
+PYTHON_BIN="$PYTHON_BIN" "$ROOT_DIR/scripts/build_macos_dmg.sh"
 
 echo "Built $ROOT_DIR/dist/Blink.app"

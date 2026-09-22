@@ -170,6 +170,7 @@ class Store:
             self._ensure_column(conn, "jobs", "priority", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(conn, "settings", "camera_view", "TEXT NOT NULL DEFAULT 'list'")
             self._ensure_column(conn, "settings", "camera_picker_view", "TEXT NOT NULL DEFAULT 'list'")
+            self._ensure_column(conn, "settings", "dismissed_release_notes_version", "TEXT NOT NULL DEFAULT ''")
             row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
             if row is None:
                 conn.execute("INSERT INTO settings (id, updated_at) VALUES (1, ?)", (utc_now(),))
@@ -271,6 +272,18 @@ class Store:
             return
         with self.connect() as conn:
             conn.execute(f"UPDATE settings SET {key} = ?, updated_at = ? WHERE id = 1", (value, utc_now()))
+
+    def has_dismissed_release_notes(self, version: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute("SELECT dismissed_release_notes_version FROM settings WHERE id = 1").fetchone()
+        return bool(row and row["dismissed_release_notes_version"] == version)
+
+    def dismiss_release_notes(self, version: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE settings SET dismissed_release_notes_version = ?, updated_at = ? WHERE id = 1",
+                (version, utc_now()),
+            )
 
     def save_settings(self, data: dict[str, Any]) -> None:
         with self.connect() as conn:

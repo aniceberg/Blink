@@ -63,7 +63,7 @@ scripts/build_macos_app.sh
 open dist/Blink.app
 ```
 
-The build script installs packaging dependencies, downloads Apple Silicon FFmpeg/FFprobe into `vendor/bin/macos-arm64/`, and packages Blink with PyInstaller and pywebview. App data defaults to `~/Library/Application Support/Blink`; completed videos still use the directory configured on the Setup page.
+The build script installs packaging dependencies, downloads Apple Silicon FFmpeg/FFprobe into `vendor/bin/macos-arm64/`, packages Blink with PyInstaller and pywebview, and writes `dist/Blink v<VERSION>.dmg`. Future builds reuse the most recent Blink DMG as a template, preserving its Finder layout and artwork while replacing only `Blink.app`. Set `BLINK_DMG_TEMPLATE=/path/to/template.dmg` to use a particular template. App data defaults to `~/Library/Application Support/Blink`; completed videos still use the directory configured on the Setup page.
 
 This package is intended for local/personal use and is not signed or notarized. Public distribution needs a signing, notarization, and license-notice review. The bundled OSXExperts FFmpeg build is GPL-oriented when libx265 is enabled; keep the generated notices in `vendor/licenses/` with the app bundle.
 

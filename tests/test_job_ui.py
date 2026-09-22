@@ -116,6 +116,19 @@ def test_new_job_defaults_to_discarding_generated_frames_after_completion():
     assert "discards the generated frame cache after a completed video and thumbnail are recorded" in response.text
 
 
+def test_release_notes_modal_shows_once_per_app_version(monkeypatch, tmp_path):
+    test_store = Store(tmp_path / "blink.sqlite3")
+    monkeypatch.setattr(main, "store", test_store)
+    client = TestClient(main.app)
+
+    initial = client.get("/")
+    dismissed = client.post("/release-notes/dismiss", data={"next_path": "/"}, follow_redirects=True)
+
+    assert "Blink 1.0.3" in initial.text
+    assert "Keep generated frames after completion" in initial.text
+    assert "Blink 1.0.3" not in dismissed.text
+
+
 def test_daily_window_rejects_same_day_overnight_window():
     try:
         main.validate_daily_window_range(
@@ -176,28 +189,14 @@ def test_setup_page_renders_detect_secret_and_folder_controls():
     assert "data-choose-output-dir" in response.text
 
 
-def test_new_job_frame_interval_options_are_sorted_by_frequency():
+def test_new_job_frame_interval_defaults_to_one_minute():
     client = TestClient(main.app)
     response = client.get("/jobs/new")
 
-    expected = [
-        'value="1s"',
-        'value="10s"',
-        'value="30s"',
-        'value="1m" selected',
-        'value="5m"',
-        'value="15m"',
-        'value="30m"',
-        'value="1h"',
-        'value="3h"',
-        'value="6h"',
-        'value="12h"',
-        'value="24h"',
-    ]
-    positions = [response.text.index(item) for item in expected]
-
     assert response.status_code == 200
-    assert positions == sorted(positions)
+    assert 'name="interval_amount" value="1"' in response.text
+    assert 'name="interval_unit"' in response.text
+    assert '<option value="minute" selected>minute</option>' in response.text
 
 
 def test_setup_page_renders_console_cards(monkeypatch, tmp_path):

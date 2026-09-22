@@ -1,22 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
-from PyInstaller.utils.hooks import collect_all
 
-datas = [('app/templates', 'app/templates'), ('app/static', 'app/static'), ('vendor/bin', 'vendor/bin'), ('vendor/licenses', 'vendor/licenses')]
-binaries = []
-hiddenimports = []
+hiddenimports = ['webview.platforms.cocoa']
 hiddenimports += collect_submodules('uvicorn')
 hiddenimports += collect_submodules('httptools')
 hiddenimports += collect_submodules('websockets')
-tmp_ret = collect_all('webview')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['launcher.py'],
     pathex=[],
-    binaries=binaries,
-    datas=datas,
+    binaries=[],
+    datas=[('app/templates', 'app/templates'), ('app/static', 'app/static'), ('vendor/bin', 'vendor/bin'), ('vendor/licenses', 'vendor/licenses')],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

@@ -623,6 +623,33 @@ input, select {
   font-size: 24px;
   line-height: 1;
 }
+.release-notes-backdrop {
+  z-index: 200;
+}
+.release-notes-modal {
+  width: min(520px, 100%);
+  padding: 28px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .32);
+}
+.release-notes-modal h1 {
+  margin: 5px 0 8px;
+  font-size: 28px;
+}
+.release-notes-kicker {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 760;
+}
+.release-notes-modal ul {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 24px;
+  padding-left: 20px;
+  color: var(--text);
+  line-height: 1.45;
+}
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

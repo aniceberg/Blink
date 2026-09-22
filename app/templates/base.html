@@ -35,5 +35,23 @@
       {% endif %}
       {% block content %}{% endblock %}
     </main>
+    {% if show_release_notes %}
+      <div class="modal-backdrop release-notes-backdrop">
+        <section class="release-notes-modal" role="dialog" aria-modal="true" aria-labelledby="release-notes-title">
+          <span class="release-notes-kicker">What's new</span>
+          <h1 id="release-notes-title">Blink {{ app_version }}</h1>
+          <p>This release keeps Blink's generated render files from quietly filling your Mac's storage.</p>
+          <ul>
+            <li>Completed jobs now discard their extracted frame cache after the MP4 and preview thumbnail are saved.</li>
+            <li>Blink clears leftover frame caches from earlier completed jobs the next time it launches.</li>
+            <li>Select <strong>Keep generated frames after completion</strong> on a job when you need those frames for troubleshooting.</li>
+          </ul>
+          <form method="post" action="/release-notes/dismiss">
+            <input type="hidden" name="next_path" value="{{ request.url.path }}">
+            <button class="button primary" type="submit">Got it</button>
+          </form>
+        </section>
+      </div>
+    {% endif %}
   </body>
 </html>

@@ -43,9 +43,11 @@ class UniFiClient:
 
     def _private_headers(self, accept: str = "application/json") -> dict[str, str]:
         headers = {"Accept": accept}
-        if self.settings.api_key:
-            key = "X-API-Key" if self._is_site_manager else "X-API-KEY"
-            headers[key] = self.settings.api_key
+        # Direct Protect historical endpoints authenticate with the private
+        # session cookie set by login_private_api, not an integration API key.
+        # Site Manager has no local session cookie, so it still needs its key.
+        if self._is_site_manager and self.settings.api_key:
+            headers["X-API-Key"] = self.settings.api_key
         return headers
 
     async def _client(self) -> httpx.AsyncClient:

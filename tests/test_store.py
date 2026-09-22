@@ -71,6 +71,16 @@ def test_store_persists_keep_intermediate_frames(tmp_path):
     assert store.get_job(job_id).keep_intermediate_frames is True
 
 
+def test_release_notes_are_dismissed_per_version(tmp_path):
+    store = Store(tmp_path / "blink.sqlite3")
+
+    assert store.has_dismissed_release_notes("1.0.3") is False
+    store.dismiss_release_notes("1.0.3")
+
+    assert store.has_dismissed_release_notes("1.0.3") is True
+    assert store.has_dismissed_release_notes("1.0.4") is False
+
+
 def test_existing_single_console_settings_migrate_to_console(tmp_path):
     db_path = tmp_path / "blink.sqlite3"
     conn = sqlite3.connect(db_path)

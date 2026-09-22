@@ -114,12 +114,21 @@ def context(request: Request, **kwargs):
         "format_interval": format_interval,
         "app_version": APP_VERSION,
         "update": get_cached_update(),
+        "show_release_notes": not store.has_dismissed_release_notes(APP_VERSION),
         **kwargs,
     }
 
 
 def render(request: Request, template_name: str, **kwargs):
     return templates.TemplateResponse(request, template_name, context(request, **kwargs))
+
+
+@app.post("/release-notes/dismiss")
+async def dismiss_release_notes(next_path: str = Form("/")):
+    store.dismiss_release_notes(APP_VERSION)
+    if not next_path.startswith("/") or next_path.startswith("//"):
+        next_path = "/"
+    return RedirectResponse(next_path, status_code=303)
 
 
 def iso_or_none(value: datetime | None) -> str | None:
