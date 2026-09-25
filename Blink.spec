@@ -38,7 +38,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['/Users/isaac/Documents/GitHub/Blink/Blink.icns'],
+    icon=['/Users/isaac/Developer/Blink/Blink.icns'],
 )
 coll = COLLECT(
     exe,
@@ -52,6 +52,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Blink.app',
-    icon='/Users/isaac/Documents/GitHub/Blink/Blink.icns',
+    icon='/Users/isaac/Developer/Blink/Blink.icns',
     bundle_identifier=None,
 )
